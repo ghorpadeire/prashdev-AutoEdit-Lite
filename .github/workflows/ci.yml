@@ -1,7 +1,5 @@
 name: Run Tests
 
-# Trigger: run this workflow whenever a PR targets main,
-# or when code is pushed directly to main.
 on:
   pull_request:
     branches: [main]
@@ -13,21 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out the code from the repo
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install Python 3.11 on the GitHub robot
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      # 3. Install only pytest — no heavy deps like whisper or ffmpeg needed
       - name: Install test dependencies
         run: pip install pytest
 
-      # 4. Run all tests inside the tests/ folder
       - name: Run tests
         run: pytest tests/ -v
-        working-directory: autoedit-lite
