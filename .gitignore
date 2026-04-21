@@ -1,0 +1,38 @@
+# API key — NEVER commit this
+.env
+
+# Video files (large, personal)
+input/
+output/
+
+# Debug logs
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE settings
+.vscode/
+.idea/
+*.code-workspace
+
+# Whisper model cache (large download files)
+# These are stored by faster-whisper in your system's cache folder,
+# not in this project directory, so this is just a safety net.
+*.bin
+*.pt
