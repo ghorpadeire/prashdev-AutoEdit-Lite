@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoEdit</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <div id="header">
+    <h1>AutoEdit <span class="version">v2.0</span></h1>
+    <p class="subtitle">AI-powered rough cut for Premiere Pro</p>
+  </div>
+
+  <!-- Setup section (hidden once configured) -->
+  <div id="setup-section" class="section hidden">
+    <p class="warning">First-time setup: point AutoEdit to your project folder.</p>
+    <button id="btn-choose-backend" class="btn btn-secondary">Choose autoedit-lite folder...</button>
+  </div>
+
+  <!-- Main controls -->
+  <div id="main-section" class="section hidden">
+
+    <div class="field">
+      <label>Video file</label>
+      <div class="file-row">
+        <input id="input-video" type="text" placeholder="No file selected" readonly/>
+        <button id="btn-browse" class="btn btn-small">Browse</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Whisper model</label>
+      <select id="select-model">
+        <option value="tiny">Tiny — fastest, less accurate</option>
+        <option value="base">Base</option>
+        <option value="small">Small</option>
+        <option value="medium" selected>Medium — recommended</option>
+        <option value="large">Large — slowest, most accurate</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Edit intensity</label>
+      <select id="select-quality">
+        <option value="light">Light — small cuts only</option>
+        <option value="balanced" selected>Balanced — recommended</option>
+        <option value="aggressive">Aggressive — heavy cuts</option>
+      </select>
+    </div>
+
+    <button id="btn-generate" class="btn btn-primary" disabled>
+      Generate Rough Cut
+    </button>
+
+    <div id="progress-section" class="hidden">
+      <div class="progress-bar-wrap">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="progress-label">Starting...</p>
+    </div>
+
+    <div id="log-box" class="hidden">
+      <pre id="log-text"></pre>
+    </div>
+
+    <div id="result-section" class="hidden">
+      <div id="result-message"></div>
+      <button id="btn-import" class="btn btn-primary">Import into Premiere</button>
+      <button id="btn-reset" class="btn btn-secondary">Start Over</button>
+    </div>
+
+  </div>
+
+  <div id="footer">
+    <button id="btn-settings" class="btn btn-link">Settings</button>
+  </div>
+
+  <script src="CSInterface.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

@@ -6,6 +6,7 @@ AutoEdit-Lite — AI-powered automatic video rough-cut tool.
 Usage:
   python main.py --input input/video.mp4
   python main.py --input input/video.mp4 --model medium --quality balanced
+  python main.py --input input/video.mp4 --mode premiere
   python main.py --input input/video.mp4 --dry-run
 """
 
@@ -23,6 +24,7 @@ VALID_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm"}
 DEFAULT_MODEL = "medium"
 DEFAULT_QUALITY = "balanced"
 DEFAULT_OUTPUT = "output/edited.mp4"
+DEFAULT_MODE = "ffmpeg"
 
 
 def _get_video_duration_seconds(path: Path) -> float:
@@ -106,6 +108,14 @@ def _parse_args() -> argparse.Namespace:
         help=f"Output video path. (default: {DEFAULT_OUTPUT})",
     )
     parser.add_argument(
+        "--mode", default=DEFAULT_MODE,
+        choices=["ffmpeg", "premiere"],
+        help=(
+            "Output mode. 'ffmpeg' cuts the video locally (default). "
+            "'premiere' exports an FCP7 XML timeline for Premiere Pro instead."
+        ),
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Transcribe and get Claude's plan, but do NOT cut the video.",
     )
@@ -132,6 +142,10 @@ def main() -> None:
     print(f"  Quality : {args.quality}")
     if args.dry_run:
         print("  Mode    : DRY RUN (no video cutting)")
+    elif args.mode == "premiere":
+        premiere_xml_path = output_path.with_suffix(".xml")
+        print(f"  Mode    : PREMIERE (FCP7 XML export)")
+        print(f"  Output  : {premiere_xml_path}")
     else:
         print(f"  Output  : {output_path}")
     print("=" * 60)
@@ -181,11 +195,31 @@ def main() -> None:
     print(f"  Claude selected {len(kept_segments)} segment(s) to keep.")
     print()
 
-    # ── Step 4a: Cut video (skip in dry-run mode) ──────────────────────────
+    # ── Step 4a: Output (skip in dry-run; choose ffmpeg or premiere mode) ───
     if args.dry_run:
         print("[3/4] Skipping video cut (--dry-run mode).")
         print()
         print("[4/4] Skipping subtitle generation (--dry-run mode).")
+        print()
+    elif args.mode == "premiere":
+        premiere_xml_path = output_path.with_suffix(".xml")
+        print("[3/4] Exporting Premiere Pro XML timeline...")
+        from xml_export import export_premiere_xml
+        export_premiere_xml(
+            input_video_path=str(input_path),
+            segments=kept_segments,
+            output_xml_path=str(premiere_xml_path),
+        )
+        print()
+
+        srt_path = output_path.with_suffix(".srt")
+        print("[4/4] Generating subtitles...")
+        from captions import generate_srt
+        generate_srt(
+            transcript_segments=transcript_segments,
+            kept_segments=kept_segments,
+            output_path=str(srt_path),
+        )
         print()
     else:
         print("[3/4] Cutting and stitching video...")
@@ -224,11 +258,16 @@ def main() -> None:
     print(f"  Segments kept     : {len(kept_segments)}")
     print()
 
-    if not args.dry_run:
+    if args.dry_run:
+        print("  (Dry run — no output files written)")
+    elif args.mode == "premiere":
+        print(f"  Premiere XML  : {output_path.with_suffix('.xml')}")
+        print(f"  Subtitles     : {output_path.with_suffix('.srt')}")
+        print()
+        print("  Import into Premiere: File -> Import -> select the .xml file")
+    else:
         print(f"  Output video  : {output_path}")
         print(f"  Subtitles     : {output_path.with_suffix('.srt')}")
-    else:
-        print("  (Dry run — no output files written)")
 
     print(f"  Debug logs    : logs/")
     print("=" * 60)

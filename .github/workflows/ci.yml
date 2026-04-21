@@ -1,0 +1,28 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Python 3.12 required — OTIO pre-built wheels are not available for 3.13+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install pytest opentimelineio otio-fcp-adapter
+
+      - name: Run tests
+        run: pytest tests/ -v
+        working-directory: autoedit-lite

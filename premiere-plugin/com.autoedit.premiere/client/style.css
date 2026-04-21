@@ -1,0 +1,230 @@
+/* AutoEdit Panel — matches Premiere Pro's dark theme */
+
+:root {
+  --bg: #1e1e1e;
+  --bg-section: #2a2a2a;
+  --bg-input: #333;
+  --border: #444;
+  --text: #d4d4d4;
+  --text-muted: #888;
+  --accent: #6c6cff;
+  --accent-hover: #8888ff;
+  --success: #4caf50;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --radius: 4px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 10px;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+#header {
+  padding: 8px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+#header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.version {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.section { margin-bottom: 12px; }
+.hidden { display: none !important; }
+
+.field { margin-bottom: 10px; }
+
+label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input[type="text"], select {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 12px;
+  outline: none;
+}
+
+input[type="text"]:focus, select:focus {
+  border-color: var(--accent);
+}
+
+.file-row {
+  display: flex;
+  gap: 6px;
+}
+
+.file-row input { flex: 1; }
+
+.btn {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-secondary {
+  background: var(--bg-section);
+  color: var(--text);
+  border: 1px solid var(--border);
+  width: 100%;
+}
+
+.btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+.btn-small {
+  background: var(--bg-section);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.btn-small:hover { background: var(--border); }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.btn-link:hover { color: var(--text); }
+
+.warning {
+  background: #3a2e00;
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.progress-bar-wrap {
+  background: var(--bg-section);
+  border-radius: var(--radius);
+  height: 4px;
+  margin: 10px 0 6px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: var(--radius);
+  transition: width 0.3s ease;
+}
+
+.progress-bar.indeterminate {
+  width: 40%;
+  animation: slide 1.2s infinite ease-in-out;
+}
+
+@keyframes slide {
+  0%   { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+#progress-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-height: 16px;
+}
+
+#log-box {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  margin-top: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+#log-text {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+#result-section { margin-top: 10px; }
+
+#result-message {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+#result-message.success {
+  background: #1a3320;
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+#result-message.error {
+  background: #3a1a1a;
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+#footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  text-align: right;
+}
