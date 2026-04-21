@@ -204,3 +204,4 @@ If you are testing this on macOS:
 3. Use `run.sh` instead of `run.bat`: `bash run.sh`
 4. Everything else works identically
 # prashdev-AutoEdit-Lite
+# prashdev-AutoEdit-Lite
