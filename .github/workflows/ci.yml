@@ -25,4 +25,3 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v
-        working-directory: autoedit-lite
