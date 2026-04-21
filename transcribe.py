@@ -6,6 +6,12 @@ faster-whisper. Returns a list of timed segments with start, end, and text.
 Nothing is sent to any external service during this step.
 """
 
+import os
+# Force CPU-only mode before ctranslate2/faster-whisper loads.
+# Without this, ctranslate2 probes for CUDA at import time on Windows and
+# crashes with "cublas64_12.dll not found" on machines without CUDA 12.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+
 import json
 import shutil
 import subprocess

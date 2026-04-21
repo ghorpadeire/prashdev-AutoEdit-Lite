@@ -95,6 +95,9 @@ echo   Press any key to start editing...
 echo   (Press Ctrl+C to cancel)
 pause >nul
 
+:: Force CPU-only mode — prevents cublas64_12.dll error on machines without CUDA 12
+set CUDA_VISIBLE_DEVICES=-1
+
 echo.
 python main.py --input "%INPUT%" --model %MODEL% --quality %QUALITY% --output output\edited.mp4
 
