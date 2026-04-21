@@ -12,9 +12,13 @@ echo ============================================================
 echo.
 pause
 
+:: Force CPU-only mode for this session so verification step works
+:: on machines without CUDA 12 installed
+set CUDA_VISIBLE_DEVICES=-1
+
 :: ── STEP 1: Check Python ─────────────────────────────────────────────────
 echo.
-echo [1/5] Checking Python...
+echo [1/6] Checking Python...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
@@ -35,7 +39,7 @@ echo   OK - Found: %PYVER%
 
 :: ── STEP 2: Install FFmpeg via winget ────────────────────────────────────
 echo.
-echo [2/5] Checking FFmpeg...
+echo [2/6] Checking FFmpeg...
 ffmpeg -version >nul 2>&1
 if %errorlevel% equ 0 (
     echo   OK - FFmpeg is already installed.
@@ -94,7 +98,7 @@ echo   OK - FFmpeg installed successfully.
 
 :: ── STEP 3: Install Python packages ──────────────────────────────────────
 echo.
-echo [3/5] Installing Python packages...
+echo [3/6] Installing Python packages...
 echo   (This downloads faster-whisper, anthropic, ffmpeg-python, dotenv)
 echo   Please wait...
 echo.
@@ -110,9 +114,31 @@ if %errorlevel% neq 0 (
 echo.
 echo   OK - All packages installed.
 
-:: ── STEP 4: Set up API key ────────────────────────────────────────────────
+:: ── STEP 4: Fix CUDA compatibility ───────────────────────────────────────
 echo.
-echo [4/5] Setting up your Anthropic API key...
+echo [4/6] Checking GPU/CUDA compatibility...
+python -c "import os; os.environ['CUDA_VISIBLE_DEVICES']=''; from faster_whisper import WhisperModel" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo   Detected a CUDA compatibility issue (cublas64_12.dll or similar).
+    echo   Installing CPU-compatible ctranslate2 build...
+    echo.
+    python -m pip install "ctranslate2>=3.20.0,<4.0.0" --force-reinstall --quiet
+    if %errorlevel% neq 0 (
+        echo.
+        echo   [ERROR] Could not fix the CUDA issue automatically.
+        echo   Please run this manually and try again:
+        echo     pip install "ctranslate2>=3.20.0,<4.0.0" --force-reinstall
+        pause
+        exit /b 1
+    )
+    echo   OK - ctranslate2 fixed. No CUDA required.
+) else (
+    echo   OK - faster-whisper loads correctly on this machine.
+)
+
+:: ── STEP 5: Set up API key ────────────────────────────────────────────────
+echo.
+echo [5/6] Setting up your Anthropic API key...
 echo.
 
 if exist .env (
@@ -142,10 +168,10 @@ pause
 
 :env_done
 
-:: ── STEP 5: Verify setup ──────────────────────────────────────────────────
+:: ── STEP 6: Verify full setup ──────────────────────────────────────────────────
 echo.
-echo [5/5] Verifying setup...
-python -c "import faster_whisper, anthropic, ffmpeg, dotenv; print('   All packages OK')"
+echo [6/6] Verifying setup...
+python -c "import os; os.environ['CUDA_VISIBLE_DEVICES']=''; import faster_whisper, anthropic, ffmpeg, dotenv; print('   All packages OK')"
 if %errorlevel% neq 0 (
     echo.
     echo   [ERROR] Some packages did not install correctly.
