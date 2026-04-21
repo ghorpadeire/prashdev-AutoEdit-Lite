@@ -12,12 +12,12 @@ import time
 from pathlib import Path
 
 # ── Model configuration ────────────────────────────────────────────────────
-MODEL = "claude-sonnet-4-5"
+MODEL = "claude-opus-4-7"
 MAX_TOKENS = 4096
 
 # Approximate token budget for the transcript portion of the prompt.
-# claude-sonnet-4-5 has a 200k context window but we keep chunks modest
-# to ensure Claude's response quality stays high.
+# claude-opus-4-7 has a 200k context window but we keep chunks modest
+# to ensure response quality stays high.
 MAX_TRANSCRIPT_TOKENS = 15_000
 CHARS_PER_TOKEN = 4            # rough approximation
 CHUNK_DURATION_SECONDS = 600   # 10-minute windows when chunking
