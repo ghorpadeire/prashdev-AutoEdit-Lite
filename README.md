@@ -203,3 +203,4 @@ If you are testing this on macOS:
 2. Use `python3` instead of `python`
 3. Use `run.sh` instead of `run.bat`: `bash run.sh`
 4. Everything else works identically
+# prashdev-AutoEdit-Lite
