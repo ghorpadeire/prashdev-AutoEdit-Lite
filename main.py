@@ -256,6 +256,15 @@ def main() -> None:
             output_path=str(srt_path),
         )
         print()
+
+        # ── LosslessCut CSV (bonus export — no extra deps) ─────────────────
+        csv_path = output_path.with_name(output_path.stem + "_cuts.csv")
+        from losslesscut_export import export_losslesscut_csv
+        export_losslesscut_csv(
+            segments=kept_segments,
+            output_csv_path=str(csv_path),
+        )
+        print()
     else:
         print("[3/4] Cutting and stitching video...")
         from editor import cut_video
@@ -278,6 +287,15 @@ def main() -> None:
         )
         print()
 
+        # ── LosslessCut CSV (bonus export — no extra deps) ─────────────────
+        csv_path = output_path.with_name(output_path.stem + "_cuts.csv")
+        from losslesscut_export import export_losslesscut_csv
+        export_losslesscut_csv(
+            segments=kept_segments,
+            output_csv_path=str(csv_path),
+        )
+        print()
+
     # ── Final summary ──────────────────────────────────────────────────────
     print("=" * 60)
     print("  DONE")
@@ -296,13 +314,20 @@ def main() -> None:
     if args.dry_run:
         print("  (Dry run — no output files written)")
     elif args.mode == "premiere":
+        csv_path = output_path.with_name(output_path.stem + "_cuts.csv")
         print(f"  Premiere XML  : {output_path.with_suffix('.xml')}")
         print(f"  Subtitles     : {output_path.with_suffix('.srt')}")
+        print(f"  LosslessCut   : {csv_path}")
         print()
-        print("  Import into Premiere: File -> Import -> select the .xml file")
+        print("  Import into Premiere : File -> Import -> select the .xml file")
+        print("  Lossless rough cut   : Drag the .csv into LosslessCut")
     else:
+        csv_path = output_path.with_name(output_path.stem + "_cuts.csv")
         print(f"  Output video  : {output_path}")
         print(f"  Subtitles     : {output_path.with_suffix('.srt')}")
+        print(f"  LosslessCut   : {csv_path}")
+        print()
+        print("  Lossless rough cut   : Drag the .csv into LosslessCut")
 
     print(f"  Debug logs    : logs/")
     print("=" * 60)

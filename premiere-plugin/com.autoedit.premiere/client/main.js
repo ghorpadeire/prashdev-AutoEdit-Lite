@@ -55,6 +55,7 @@
   var importHint      = document.getElementById("import-hint");
   var btnImportSrt    = document.getElementById("btn-import-srt");
   var importSrtHint   = document.getElementById("import-srt-hint");
+  var losslesscutHint = document.getElementById("losslesscut-hint");
   var btnReset        = document.getElementById("btn-reset");
 
   var videoPath = "";
@@ -424,6 +425,7 @@
       importSrtHint.classList.add("hidden");
     }
 
+    losslesscutHint.classList.remove("hidden");
     sectionResult.classList.remove("hidden");
   }
 
@@ -437,6 +439,7 @@
     btnImportSrt.classList.add("hidden");
     importHint.classList.add("hidden");
     importSrtHint.classList.add("hidden");
+    losslesscutHint.classList.add("hidden");
     sectionResult.classList.remove("hidden");
 
     if (!logVisible) {
@@ -468,6 +471,7 @@
     outputFiles.classList.add("hidden");
     btnImportSrt.classList.add("hidden");
     importSrtHint.classList.add("hidden");
+    losslesscutHint.classList.add("hidden");
     resetSteps();
   }
 
