@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <!-- Settings row -->
+    <!-- Settings row 1: transcription + edit style -->
     <div class="settings-row">
       <div class="setting-item">
         <div class="card-label">WHISPER MODEL</div>
@@ -49,7 +49,7 @@
           <option value="tiny">Tiny — fastest</option>
           <option value="base">Base</option>
           <option value="small">Small</option>
-          <option value="medium" selected>Medium ✓ recommended</option>
+          <option value="medium" selected>Medium ✓</option>
           <option value="large">Large — most accurate</option>
         </select>
       </div>
@@ -61,6 +61,35 @@
           <option value="aggressive">Aggressive</option>
         </select>
       </div>
+    </div>
+
+    <!-- Settings row 2: output format -->
+    <div class="settings-row">
+      <div class="setting-item">
+        <div class="card-label">TARGET LENGTH</div>
+        <select id="select-duration">
+          <option value="60">60s — 1 min</option>
+          <option value="90" selected>90s — 1.5 min ✓</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <div class="card-label">FORMAT</div>
+        <select id="select-aspect">
+          <option value="9:16" selected>9:16 Vertical ✓</option>
+          <option value="16:9">16:9 Horizontal</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Platform -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-label">PLATFORM</div>
+      <select id="select-platform">
+        <option value="reels">Instagram Reels</option>
+        <option value="tiktok">TikTok</option>
+        <option value="shorts">YouTube Shorts</option>
+        <option value="general" selected>General / Premiere ✓</option>
+      </select>
     </div>
 
     <!-- Generate button -->

@@ -4,10 +4,13 @@ xml_export.py
 Exports Claude's kept segments as a Final Cut Pro 7 XML (XMEML) timeline
 that Adobe Premiere Pro can import as a new sequence with all cuts pre-applied.
 
-Uses OpenTimelineIO's otio-fcp-adapter — a battle-tested open-source library
-used in professional post-production pipelines — to generate the XML.
+Uses OpenTimelineIO's otio-fcp-adapter to generate the base XML, then
+post-processes it to inject the correct sequence resolution and frame rate
+so Premiere Pro opens it in the right format (e.g. 1080x1920 @ 30fps for
+vertical social content).
 """
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -34,10 +37,54 @@ def _detect_fps(video_path: str) -> float:
         return 25.0
 
 
+def _inject_sequence_settings(xml_path: str, width: int, height: int, fps: float) -> None:
+    """
+    Post-process the OTIO-generated FCP7 XML to embed sequence resolution and
+    frame rate. Premiere Pro reads these values to set up the sequence correctly
+    when the file is imported.
+
+    Injects a <format><samplecharacteristics> block inside the first <video>
+    element (inside <media>) before the first <track>.
+    """
+    timebase = str(round(fps))
+    ntsc = "TRUE" if abs(fps - round(fps)) > 0.01 else "FALSE"
+
+    format_xml = (
+        f"<format>"
+        f"<samplecharacteristics>"
+        f"<width>{width}</width>"
+        f"<height>{height}</height>"
+        f"<anamorphic>FALSE</anamorphic>"
+        f"<pixelaspectratio>square</pixelaspectratio>"
+        f"<fielddominance>none</fielddominance>"
+        f"<rate><timebase>{timebase}</timebase><ntsc>{ntsc}</ntsc></rate>"
+        f"</samplecharacteristics>"
+        f"</format>"
+    )
+
+    with open(xml_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Insert the format block immediately before the first <track> inside <video>.
+    # The regex is non-greedy and only replaces the first occurrence.
+    updated = re.sub(
+        r"(<video>)([\s\S]*?)(<track>)",
+        lambda m: m.group(1) + m.group(2) + format_xml + m.group(3),
+        content,
+        count=1,
+    )
+
+    with open(xml_path, "w", encoding="utf-8") as f:
+        f.write(updated)
+
+
 def export_premiere_xml(
     input_video_path: str,
     segments: list[dict],
     output_xml_path: str,
+    width: int = 1920,
+    height: int = 1080,
+    target_fps: int | None = None,
 ) -> None:
     """
     Write a Premiere Pro-importable FCP7 XML timeline to output_xml_path.
@@ -50,9 +97,17 @@ def export_premiere_xml(
         Kept segments from analyze.py: [{"start": float, "end": float, "reason": str}, ...]
     output_xml_path : str
         Destination path for the .xml file.
+    width : int
+        Sequence width in pixels (default: 1920). Use 1080 for 9:16 vertical.
+    height : int
+        Sequence height in pixels (default: 1080). Use 1920 for 9:16 vertical.
+    target_fps : int | None
+        Override the detected frame rate (e.g. 30). None = auto-detect from video.
     """
-    fps = _detect_fps(input_video_path)
-    print(f"  Detected frame rate: {fps:.3f} fps")
+    detected_fps = _detect_fps(input_video_path)
+    fps = float(target_fps) if target_fps is not None else detected_fps
+    print(f"  Detected frame rate: {detected_fps:.3f} fps  |  Sequence fps: {fps:.0f}")
+    print(f"  Sequence resolution: {width}x{height}")
 
     timeline = otio.schema.Timeline(name="AutoEdit — Rough Cut")
 
@@ -64,7 +119,6 @@ def export_premiere_xml(
     abs_path = Path(input_video_path).resolve().as_posix()
 
     # FCP7 adapter requires available_range on the media reference.
-    # Use the max segment end time + 1s buffer as the total available duration.
     max_end_sec = max((seg["end"] for seg in segments), default=0.0)
     available_range = otio.opentime.TimeRange(
         start_time=otio.opentime.RationalTime(0, fps),
@@ -103,4 +157,8 @@ def export_premiere_xml(
     output_path = Path(output_xml_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     otio.adapters.write_to_file(timeline, str(output_path), adapter_name="fcp_xml")
+
+    # Inject sequence resolution and fps into the generated XML
+    _inject_sequence_settings(str(output_path), width=width, height=height, fps=fps)
+
     print(f"  Premiere XML saved to: {output_path}")

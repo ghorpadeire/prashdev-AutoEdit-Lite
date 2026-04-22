@@ -25,6 +25,9 @@ DEFAULT_MODEL = "medium"
 DEFAULT_QUALITY = "balanced"
 DEFAULT_OUTPUT = "output/edited.mp4"
 DEFAULT_MODE = "ffmpeg"
+DEFAULT_TARGET_DURATION = 90      # seconds
+DEFAULT_ASPECT_RATIO = "16:9"
+DEFAULT_PLATFORM = "general"
 
 
 def _get_video_duration_seconds(path: Path) -> float:
@@ -116,6 +119,30 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--target-duration", type=int, default=DEFAULT_TARGET_DURATION,
+        metavar="SECONDS",
+        help=(
+            f"Target length of the final cut in seconds. "
+            f"Claude will aim for this duration. (default: {DEFAULT_TARGET_DURATION})"
+        ),
+    )
+    parser.add_argument(
+        "--aspect-ratio", default=DEFAULT_ASPECT_RATIO,
+        choices=["9:16", "16:9"],
+        help=(
+            "Output aspect ratio. '9:16' for vertical (Instagram Reels, TikTok, Shorts). "
+            f"'16:9' for horizontal (default: {DEFAULT_ASPECT_RATIO})"
+        ),
+    )
+    parser.add_argument(
+        "--platform", default=DEFAULT_PLATFORM,
+        choices=["reels", "tiktok", "shorts", "general"],
+        help=(
+            "Target platform — used to tailor Claude's editing style and pacing. "
+            f"(default: {DEFAULT_PLATFORM})"
+        ),
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Transcribe and get Claude's plan, but do NOT cut the video.",
     )
@@ -140,6 +167,7 @@ def main() -> None:
     print(f"  Input   : {input_path}")
     print(f"  Model   : {args.model}")
     print(f"  Quality : {args.quality}")
+    print(f"  Target  : {args.target_duration}s  |  {args.aspect_ratio}  |  {args.platform}")
     if args.dry_run:
         print("  Mode    : DRY RUN (no video cutting)")
     elif args.mode == "premiere":
@@ -180,6 +208,9 @@ def main() -> None:
         segments=transcript_segments,
         quality_mode=args.quality,
         video_duration=original_duration,
+        target_duration=args.target_duration,
+        aspect_ratio=args.aspect_ratio,
+        platform=args.platform,
         logs_dir="logs",
         prompts_dir="prompts",
     )
@@ -205,10 +236,14 @@ def main() -> None:
         premiere_xml_path = output_path.with_suffix(".xml")
         print("[3/4] Exporting Premiere Pro XML timeline...")
         from xml_export import export_premiere_xml
+        xml_width, xml_height = (1080, 1920) if args.aspect_ratio == "9:16" else (1920, 1080)
         export_premiere_xml(
             input_video_path=str(input_path),
             segments=kept_segments,
             output_xml_path=str(premiere_xml_path),
+            width=xml_width,
+            height=xml_height,
+            target_fps=30,
         )
         print()
 
