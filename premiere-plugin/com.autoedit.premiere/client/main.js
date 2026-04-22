@@ -1,16 +1,5 @@
 /**
  * main.js — AutoEdit CEP panel logic v2.1
- *
- * Fix 1: On startup, read installer-written settings.json from
- *         %APPDATA%\AutoEdit\settings.json (Windows) or
- *         ~/Library/Application Support/AutoEdit/settings.json (Mac)
- *         and merge into localStorage so the panel auto-configures
- *         after a clean install without requiring the folder dialog.
- *
- * Fix 2: When the ExtendScript folder dialog fails (common on Windows
- *         with unsigned/debug extensions), reveal a plain text-input
- *         so the user can type the path manually instead of seeing a
- *         button that silently does nothing.
  */
 
 (function () {
@@ -25,6 +14,7 @@
   // ── State ──────────────────────────────────────────────────────────────
   var settings    = { backendPath: "", pythonPath: "" };
   var lastXmlPath = "";
+  var lastSrtPath = "";
   var currentStep = 0;
   var logVisible  = false;
 
@@ -58,8 +48,13 @@
   var statOriginal    = document.getElementById("stat-original");
   var statEdited      = document.getElementById("stat-edited");
   var statBadge       = document.getElementById("stat-badge");
+  var outputFiles     = document.getElementById("output-files");
+  var outputXmlPath   = document.getElementById("output-xml-path");
+  var outputSrtPath   = document.getElementById("output-srt-path");
   var btnImport       = document.getElementById("btn-import");
   var importHint      = document.getElementById("import-hint");
+  var btnImportSrt    = document.getElementById("btn-import-srt");
+  var importSrtHint   = document.getElementById("import-srt-hint");
   var btnReset        = document.getElementById("btn-reset");
 
   var videoPath = "";
@@ -227,6 +222,7 @@
     var videoDir  = path.dirname(videoPath);
     var videoBase = path.basename(videoPath, path.extname(videoPath));
     lastXmlPath   = path.join(videoDir, videoBase + "_autoedit.xml");
+    lastSrtPath   = path.join(videoDir, videoBase + "_autoedit.srt");
 
     var python = settings.pythonPath || detectPython();
     var args   = [
@@ -260,7 +256,7 @@
         setStepDone(4);
         showSuccess();
       } else {
-        showError("Something went wrong. Toggle the log above to see what happened.");
+        showError("Something went wrong. Toggle the log above to see details.");
       }
       btnGenerate.disabled = false;
       btnBrowse.disabled   = false;
@@ -280,17 +276,37 @@
     btnLogToggle.textContent = logVisible ? "Hide log ▴" : "Show log ▾";
   });
 
-  // ── Import ─────────────────────────────────────────────────────────────
+  // ── Import XML ─────────────────────────────────────────────────────────
   btnImport.addEventListener("click", function () {
-    var script = 'importXmlSequence("' + lastXmlPath.replace(/\\/g, "\\\\") + '")';
-    csInterface.evalScript(script, function (result) {
+    var escaped = lastXmlPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    csInterface.evalScript('importXmlSequence("' + escaped + '")', function (result) {
       if (result === "SUCCESS") {
-        resultTitle.textContent = "Sequence imported into your project!";
+        resultTitle.textContent = "Timeline imported!";
         btnImport.disabled = true;
         importHint.classList.add("hidden");
       } else {
-        importHint.textContent = "Auto-import failed — go to File → Import and pick: " + lastXmlPath;
+        importHint.textContent = "Auto-import failed. Go to File → Import → pick: " + lastXmlPath;
         importHint.classList.remove("hidden");
+      }
+    });
+  });
+
+  // ── Import SRT ─────────────────────────────────────────────────────────
+  btnImportSrt.addEventListener("click", function () {
+    if (!lastSrtPath || !fs.existsSync(lastSrtPath)) {
+      importSrtHint.textContent = "SRT file not found: " + lastSrtPath;
+      importSrtHint.classList.remove("hidden");
+      return;
+    }
+    var escaped = lastSrtPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    csInterface.evalScript('importSrtFile("' + escaped + '")', function (result) {
+      if (result === "SUCCESS") {
+        btnImportSrt.textContent = "✓ Subtitles imported";
+        btnImportSrt.disabled = true;
+        importSrtHint.classList.add("hidden");
+      } else {
+        importSrtHint.textContent = "Auto-import failed. Go to File → Import → pick: " + lastSrtPath;
+        importSrtHint.classList.remove("hidden");
       }
     });
   });
@@ -336,9 +352,9 @@
   // ── Parse result stats from log ────────────────────────────────────────
   function parseStats(log) {
     var orig, edited, pct;
-    var mOrig    = log.match(/Original duration\s*:\s*([0-9:]+)/);
-    var mEdited  = log.match(/Edited duration\s*:\s*([0-9:]+)/);
-    var mReduct  = log.match(/Reduction\s*:\s*(\d+)%/);
+    var mOrig   = log.match(/Original duration\s*:\s*([0-9:]+)/);
+    var mEdited = log.match(/Edited duration\s*:\s*([0-9:]+)/);
+    var mReduct = log.match(/Reduction\s*:\s*(\d+)%/);
     if (mOrig)   orig   = mOrig[1];
     if (mEdited) edited = mEdited[1];
     if (mReduct) pct    = mReduct[1];
@@ -378,9 +394,9 @@
   function showSuccess() {
     var stats = parseStats(logText.textContent);
 
-    resultBanner.className    = "result-banner success";
-    resultIcon.textContent    = "✓";
-    resultTitle.textContent   = "Rough cut ready!";
+    resultBanner.className  = "result-banner success";
+    resultIcon.textContent  = "✓";
+    resultTitle.textContent = "Rough cut ready!";
 
     if (stats.orig && stats.edited && stats.pct) {
       statOriginal.textContent = stats.orig;
@@ -389,9 +405,25 @@
       resultStats.classList.remove("hidden");
     }
 
+    // Show output file paths
+    if (outputXmlPath) outputXmlPath.textContent = path.basename(lastXmlPath);
+    if (outputSrtPath) outputSrtPath.textContent = path.basename(lastSrtPath);
+    outputFiles.classList.remove("hidden");
+
+    // XML import button
+    btnImport.textContent = "↓  Import Timeline (.xml)";
     btnImport.classList.remove("hidden");
     btnImport.disabled = false;
     importHint.classList.add("hidden");
+
+    // SRT import button — only show if SRT was actually created
+    if (fs.existsSync(lastSrtPath)) {
+      btnImportSrt.textContent = "↓  Import Subtitles (.srt)";
+      btnImportSrt.classList.remove("hidden");
+      btnImportSrt.disabled = false;
+      importSrtHint.classList.add("hidden");
+    }
+
     sectionResult.classList.remove("hidden");
   }
 
@@ -400,11 +432,13 @@
     resultIcon.textContent  = "✕";
     resultTitle.textContent = msg;
     resultStats.classList.add("hidden");
+    outputFiles.classList.add("hidden");
     btnImport.classList.add("hidden");
+    btnImportSrt.classList.add("hidden");
     importHint.classList.add("hidden");
+    importSrtHint.classList.add("hidden");
     sectionResult.classList.remove("hidden");
 
-    // Auto-show log on error
     if (!logVisible) {
       logVisible = true;
       logBox.classList.remove("hidden");
@@ -420,6 +454,7 @@
   function resetUI() {
     videoPath   = "";
     lastXmlPath = "";
+    lastSrtPath = "";
     fileDisplay.textContent = "No file selected";
     fileDisplay.classList.remove("has-file");
     fileDisplay.title = "";
@@ -430,6 +465,9 @@
     btnLogToggle.textContent = "Show log ▾";
     sectionProgress.classList.add("hidden");
     sectionResult.classList.add("hidden");
+    outputFiles.classList.add("hidden");
+    btnImportSrt.classList.add("hidden");
+    importSrtHint.classList.add("hidden");
     resetSteps();
   }
 
