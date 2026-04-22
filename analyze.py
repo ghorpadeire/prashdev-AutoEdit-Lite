@@ -179,8 +179,8 @@ def _analyze_chunk(
 
     platform_label = _PLATFORM_LABELS.get(platform, "General")
     platform_context = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["general"])
-    min_duration = max(10, target_duration - 15)
-    max_duration = target_duration + 15
+    min_duration = max(10, round(target_duration * 0.85))
+    max_duration = round(target_duration * 1.1)
 
     prompt = prompt_template.replace("{quality_mode}", quality_mode.upper() + " MODE")
     prompt = prompt.replace("{transcript}", transcript_str)
@@ -203,6 +203,16 @@ def _analyze_chunk(
             raw_log.write_text(raw_response, encoding="utf-8")
 
             validated = _parse_and_validate_json(raw_response, video_duration, chunk_start_offset)
+
+            # Enforce duration budget — trim from the end if Claude overran
+            min_duration = max(10, round(target_duration * 0.85))
+            max_duration = round(target_duration * 1.1)
+            total = sum(s["end"] - s["start"] for s in validated)
+            if total > max_duration and validated:
+                while validated and total > max_duration:
+                    removed = validated.pop()
+                    total -= (removed["end"] - removed["start"])
+                print(f"  [Duration enforcement] Trimmed to {total:.1f}s (target: {target_duration}s, max: {max_duration}s)")
 
             # Save clean JSON
             clean_log = logs_dir / f"claude_clean_chunk{chunk_index}.json"

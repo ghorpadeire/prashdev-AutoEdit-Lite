@@ -10,6 +10,15 @@ Target cut : {target_duration} seconds  (acceptable range: {min_duration}s – {
 
 The concatenated duration of all segments you select MUST fall within the acceptable range above. Do not go shorter or longer. If the raw footage is shorter than the minimum, keep the best content available and note it in the summary.
 
+DURATION RULE — NON-NEGOTIABLE:
+Before writing your final JSON, you MUST verify your total:
+  Step 1: For every segment, calculate (end - start).
+  Step 2: Sum all of them.
+  Step 3: If sum > {max_duration}s → remove the least important segments until sum ≤ {max_duration}s.
+  Step 4: If sum < {min_duration}s → add more segments from the transcript.
+A single long segment (e.g. 48s) can consume more than half your budget — break it up or cut it.
+Do NOT output JSON until your total duration is within {min_duration}s–{max_duration}s.
+
 ==================================================
 EDITING PHILOSOPHY
 ==================================================
