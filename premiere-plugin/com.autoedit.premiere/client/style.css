@@ -580,3 +580,32 @@ select:focus { border-color: var(--accent); }
   background: rgba(74, 222, 128, 0.08);
   border-color: rgba(74, 222, 128, 0.7);
 }
+
+/* ── LosslessCut hint ────────────────────────────────────────────────── */
+
+.losslesscut-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 6px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  line-height: 1.5;
+}
+
+.losslesscut-hint code {
+  color: var(--text-muted, #ccc);
+  font-family: monospace;
+}
+
+.losslesscut-hint a {
+  color: var(--accent, #4ade80);
+  text-decoration: none;
+}
+
+.losslesscut-hint a:hover {
+  text-decoration: underline;
+}
