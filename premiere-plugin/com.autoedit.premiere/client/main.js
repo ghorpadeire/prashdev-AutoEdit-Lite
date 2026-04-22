@@ -42,6 +42,9 @@
   var fileDisplay     = document.getElementById("file-display");
   var selectModel     = document.getElementById("select-model");
   var selectQuality   = document.getElementById("select-quality");
+  var selectDuration  = document.getElementById("select-duration");
+  var selectAspect    = document.getElementById("select-aspect");
+  var selectPlatform  = document.getElementById("select-platform");
   var btnGenerate     = document.getElementById("btn-generate");
   var sectionProgress = document.getElementById("section-progress");
   var sectionResult   = document.getElementById("section-result");
@@ -228,11 +231,14 @@
     var python = settings.pythonPath || detectPython();
     var args   = [
       path.join(settings.backendPath, "main.py"),
-      "--input",   videoPath,
-      "--mode",    "premiere",
-      "--model",   selectModel.value,
-      "--quality", selectQuality.value,
-      "--output",  path.join(videoDir, videoBase + "_autoedit.mp4"),
+      "--input",           videoPath,
+      "--mode",            "premiere",
+      "--model",           selectModel.value,
+      "--quality",         selectQuality.value,
+      "--target-duration", selectDuration.value,
+      "--aspect-ratio",    selectAspect.value,
+      "--platform",        selectPlatform.value,
+      "--output",          path.join(videoDir, videoBase + "_autoedit.mp4"),
     ];
 
     startRun();

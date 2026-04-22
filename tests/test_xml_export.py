@@ -11,7 +11,7 @@ from unittest.mock import patch
 import opentimelineio as otio
 import pytest
 
-from xml_export import _detect_fps, export_premiere_xml
+from xml_export import _detect_fps, _inject_sequence_settings, export_premiere_xml
 
 
 FAKE_SEGMENTS = [
@@ -104,3 +104,37 @@ class TestExportPremiereXml:
         kinds = {t.kind for t in timeline.tracks}
         assert otio.schema.TrackKind.Video in kinds
         assert otio.schema.TrackKind.Audio in kinds
+
+    def test_vertical_resolution_injected(self, tmp_path):
+        out = tmp_path / "vertical.xml"
+        with patch("xml_export._detect_fps", return_value=30.0):
+            export_premiere_xml(
+                "/fake/video.mp4", FAKE_SEGMENTS, str(out),
+                width=1080, height=1920, target_fps=30,
+            )
+        content = out.read_text()
+        assert "<width>1080</width>" in content
+        assert "<height>1920</height>" in content
+        assert "<timebase>30</timebase>" in content
+
+    def test_horizontal_resolution_injected(self, tmp_path):
+        out = tmp_path / "horizontal.xml"
+        with patch("xml_export._detect_fps", return_value=25.0):
+            export_premiere_xml(
+                "/fake/video.mp4", FAKE_SEGMENTS, str(out),
+                width=1920, height=1080,
+            )
+        content = out.read_text()
+        assert "<width>1920</width>" in content
+        assert "<height>1080</height>" in content
+
+    def test_target_fps_overrides_detected(self, tmp_path):
+        out = tmp_path / "fps30.xml"
+        # detected fps would be 25 from mock, but target_fps=30 should win
+        with patch("xml_export._detect_fps", return_value=25.0):
+            export_premiere_xml(
+                "/fake/video.mp4", FAKE_SEGMENTS, str(out),
+                target_fps=30,
+            )
+        content = out.read_text()
+        assert "<timebase>30</timebase>" in content

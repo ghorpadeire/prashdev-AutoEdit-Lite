@@ -130,6 +130,37 @@ def _parse_and_validate_json(
     return validated
 
 
+_PLATFORM_CONTEXT = {
+    "reels": (
+        "Instagram Reels: Hook the viewer in the first 3 seconds — open with the strongest, "
+        "most surprising or relatable statement. Pacing should feel snappy. Subtitles are "
+        "essential (most viewers watch without sound). End on an emotion, a revelation, or "
+        "a clear takeaway. Avoid slow build-ups."
+    ),
+    "tiktok": (
+        "TikTok: Immediate value is non-negotiable — the first 2 seconds must give the viewer "
+        "a reason to stay. High energy, direct address, and frequent re-engagement moments "
+        "(questions, surprising facts). End with a satisfying conclusion or cliffhanger."
+    ),
+    "shorts": (
+        "YouTube Shorts: Viewers skew educational and value clarity. Open with the question "
+        "or problem, deliver the answer step by step, close with a memorable summary. Pacing "
+        "can be slightly slower than Reels/TikTok but still faster than long-form."
+    ),
+    "general": (
+        "General / Premiere edit: Focus on storytelling clarity and pacing. No platform-specific "
+        "constraints — prioritise coherence and engagement over speed."
+    ),
+}
+
+_PLATFORM_LABELS = {
+    "reels": "Instagram Reels",
+    "tiktok": "TikTok",
+    "shorts": "YouTube Shorts",
+    "general": "General",
+}
+
+
 def _analyze_chunk(
     client,
     segments: list[dict],
@@ -139,11 +170,26 @@ def _analyze_chunk(
     chunk_start_offset: float,
     logs_dir: Path,
     chunk_index: int,
+    target_duration: int = 90,
+    aspect_ratio: str = "16:9",
+    platform: str = "general",
 ) -> list[dict]:
     """Run one Claude request for a single transcript chunk. Retries up to 3 times."""
     transcript_str = _format_transcript(segments)
+
+    platform_label = _PLATFORM_LABELS.get(platform, "General")
+    platform_context = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["general"])
+    min_duration = max(10, target_duration - 15)
+    max_duration = target_duration + 15
+
     prompt = prompt_template.replace("{quality_mode}", quality_mode.upper() + " MODE")
     prompt = prompt.replace("{transcript}", transcript_str)
+    prompt = prompt.replace("{target_duration}", str(target_duration))
+    prompt = prompt.replace("{min_duration}", str(min_duration))
+    prompt = prompt.replace("{max_duration}", str(max_duration))
+    prompt = prompt.replace("{aspect_ratio}", aspect_ratio)
+    prompt = prompt.replace("{platform_label}", platform_label)
+    prompt = prompt.replace("{platform_context}", platform_context)
 
     raw_response = ""
     extra_prefix = ""
@@ -181,6 +227,9 @@ def analyze_transcript(
     segments: list[dict],
     quality_mode: str,
     video_duration: float,
+    target_duration: int = 90,
+    aspect_ratio: str = "16:9",
+    platform: str = "general",
     logs_dir: str = "logs",
     prompts_dir: str = "prompts",
 ) -> list[dict]:
@@ -195,6 +244,12 @@ def analyze_transcript(
         "light" | "balanced" | "aggressive"
     video_duration : float
         Total duration of the input video in seconds.
+    target_duration : int
+        Target length of the final cut in seconds (default: 90).
+    aspect_ratio : str
+        Output aspect ratio, e.g. "9:16" or "16:9" (default: "16:9").
+    platform : str
+        Target platform: "reels", "tiktok", "shorts", or "general" (default: "general").
     logs_dir : str
         Directory for saving debug logs.
     prompts_dir : str
@@ -233,6 +288,7 @@ def analyze_transcript(
         kept_segments = _analyze_in_chunks(
             client, segments, quality_mode, video_duration,
             prompt_template, logs_path,
+            target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
         )
     else:
         print(f"  Transcript size: ~{estimated_tokens:,} tokens — sending in one request.")
@@ -240,6 +296,7 @@ def analyze_transcript(
             client, segments, quality_mode, video_duration,
             prompt_template, chunk_start_offset=0.0,
             logs_dir=logs_path, chunk_index=0,
+            target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
         )
 
     # Merge the main raw/clean logs from chunk 0 into the standard names
@@ -262,6 +319,9 @@ def _analyze_in_chunks(
     video_duration: float,
     prompt_template: str,
     logs_path: Path,
+    target_duration: int = 90,
+    aspect_ratio: str = "16:9",
+    platform: str = "general",
 ) -> list[dict]:
     """Split segments into 10-minute chunks and process each separately."""
     chunks: list[tuple[float, list[dict]]] = []
@@ -283,7 +343,6 @@ def _analyze_in_chunks(
     all_kept: list[dict] = []
     for i, (chunk_offset, chunk_segs) in enumerate(chunks):
         print(f"  Processing chunk {i + 1}/{len(chunks)} (starting at {_fmt_time(chunk_offset)})...")
-        # Pass chunk segments with times relative to chunk start
         relative_segs = [
             {**s, "start": s["start"] - chunk_offset, "end": s["end"] - chunk_offset}
             for s in chunk_segs
@@ -292,6 +351,7 @@ def _analyze_in_chunks(
             client, relative_segs, quality_mode, video_duration,
             prompt_template, chunk_start_offset=chunk_offset,
             logs_dir=logs_path, chunk_index=i,
+            target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
         )
         all_kept.extend(kept)
 
