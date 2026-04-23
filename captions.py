@@ -56,13 +56,14 @@ def generate_srt(
         seg_end = kept["end"]
         seg_duration = seg_end - seg_start
 
-        # Find all transcript lines that overlap with this kept segment
+        # Find all transcript lines that START within this kept segment.
+        # Requiring t["start"] >= seg_start (with 0.1s grace) prevents
+        # text from cut footage bleeding into the first subtitle entry.
         matching: list[dict] = []
         for t in transcript_segments:
-            # Include if any overlap exists
             overlap_start = max(t["start"], seg_start)
             overlap_end = min(t["end"], seg_end)
-            if overlap_end > overlap_start and t["text"].strip():
+            if t["start"] >= seg_start - 0.1 and overlap_end > overlap_start and t["text"].strip():
                 matching.append(t)
 
         if not matching:
