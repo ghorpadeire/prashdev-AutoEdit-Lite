@@ -284,14 +284,14 @@ def analyze_transcript(
     if estimated_tokens > MAX_TRANSCRIPT_TOKENS:
         print(f"  Transcript is large (~{estimated_tokens:,} tokens). Chunking into 10-minute windows.")
         if video_duration > 1800:
-            print("  [NOTE] Video is over 30 minutes — processing will take longer and cost a little more.")
+            print("  [NOTE] Video is over 30 minutes - processing will take longer and cost a little more.")
         kept_segments = _analyze_in_chunks(
             client, segments, quality_mode, video_duration,
             prompt_template, logs_path,
             target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
         )
     else:
-        print(f"  Transcript size: ~{estimated_tokens:,} tokens — sending in one request.")
+        print(f"  Transcript size: ~{estimated_tokens:,} tokens - sending in one request.")
         kept_segments = _analyze_chunk(
             client, segments, quality_mode, video_duration,
             prompt_template, chunk_start_offset=0.0,

@@ -82,13 +82,13 @@ def cut_video(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not segments:
-        print("  [WARNING] No segments to keep — output video not created.")
+        print("  [WARNING] No segments to keep - output video not created.")
         return 0.0
 
     n = len(segments)
     has_audio = _has_audio_stream(input_path)
     if not has_audio:
-        print("  [NOTE] Source video has no audio stream — output will be video-only.")
+        print("  [NOTE] Source video has no audio stream - output will be video-only.")
 
     # ── Build the filter_complex string ───────────────────────────────────
     # For each segment: trim video (and audio if present), reset timestamps,
@@ -147,7 +147,7 @@ def cut_video(
         return 0.0
 
     print(f"  Cutting {n} segment(s) and stitching into: {output_path.name}")
-    print("  (Re-encoding video — this may take a minute...)")
+    print("  (Re-encoding video - this may take a minute...)")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 

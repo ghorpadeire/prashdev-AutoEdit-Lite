@@ -86,7 +86,7 @@ def transcribe_video(
     # Load the faster-whisper model
     # device="cpu" works on all machines; compute_type="int8" is memory-efficient
     print(f"  Loading Whisper model: {model_name}")
-    print("  (First run downloads model files — this may take a few minutes)")
+    print("  (First run downloads model files - this may take a few minutes)")
 
     try:
         from faster_whisper import WhisperModel
@@ -126,6 +126,6 @@ def transcribe_video(
             f, indent=2, ensure_ascii=False,
         )
 
-    print(f"  Transcription complete — {len(segments)} segments found")
+    print(f"  Transcription complete - {len(segments)} segments found")
     print(f"  Saved transcript to: {transcript_log}")
     return segments
