@@ -60,7 +60,7 @@ def export_losslesscut_csv(
     → Drag this file into LosslessCut for a lossless rough cut.
     """
     if not segments:
-        print("  [WARNING] No segments to export — LosslessCut CSV not written.")
+        print("  [WARNING] No segments to export - LosslessCut CSV not written.")
         return
 
     output_path = Path(output_csv_path)
@@ -72,7 +72,7 @@ def export_losslesscut_csv(
         for i, seg in enumerate(segments, start=1):
             # Use Claude's reason as the label; fall back to a timestamp label.
             reason = (seg.get("reason") or "").strip()
-            label = reason if reason else f"segment {i} ({seg['start']:.1f}s–{seg['end']:.1f}s)"
+            label = reason if reason else f"segment {i} ({seg['start']:.1f}s-{seg['end']:.1f}s)"
             # LosslessCut labels have no hard limit but keep them readable.
             label = label[:100]
             writer.writerow([
@@ -82,4 +82,4 @@ def export_losslesscut_csv(
             ])
 
     print(f"  LosslessCut CSV saved to: {output_path}")
-    print(f"  → Drag this file into LosslessCut for an instant lossless rough cut.")
+    print(f"  -> Drag this file into LosslessCut for an instant lossless rough cut.")

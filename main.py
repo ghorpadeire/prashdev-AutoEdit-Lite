@@ -16,6 +16,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Windows cp1252 consoles crash on Unicode chars like -> and --. Force UTF-8.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
+
 
 # ── Supported input formats ────────────────────────────────────────────────
 VALID_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm"}
@@ -312,7 +320,7 @@ def main() -> None:
     print()
 
     if args.dry_run:
-        print("  (Dry run — no output files written)")
+        print("  (Dry run - no output files written)")
     elif args.mode == "premiere":
         csv_path = output_path.with_name(output_path.stem + "_cuts.csv")
         print(f"  Premiere XML  : {output_path.with_suffix('.xml')}")
