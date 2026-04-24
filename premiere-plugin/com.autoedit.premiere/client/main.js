@@ -220,10 +220,16 @@
   btnGenerate.addEventListener("click", function () {
     if (!videoPath) return;
 
-    var videoDir  = path.dirname(videoPath);
-    var videoBase = path.basename(videoPath, path.extname(videoPath));
-    lastXmlPath   = path.join(videoDir, videoBase + "_autoedit.xml");
-    lastSrtPath   = path.join(videoDir, videoBase + "_autoedit.srt");
+    var videoDir   = path.dirname(videoPath);
+    var videoBase  = path.basename(videoPath, path.extname(videoPath));
+    // All outputs go into a dedicated subfolder next to the source video:
+    //   VideoName_autoedit/VideoName_autoedit.xml
+    //   VideoName_autoedit/VideoName_autoedit.srt
+    //   VideoName_autoedit/logs/transcript.json
+    var outputDir  = path.join(videoDir, videoBase + "_autoedit");
+    if (!fs.existsSync(outputDir)) { fs.mkdirSync(outputDir, { recursive: true }); }
+    lastXmlPath    = path.join(outputDir, videoBase + "_autoedit.xml");
+    lastSrtPath    = path.join(outputDir, videoBase + "_autoedit.srt");
 
     var python = settings.pythonPath || detectPython();
     var args   = [
@@ -235,7 +241,7 @@
       "--target-duration", selectDuration.value,
       "--aspect-ratio",    selectAspect.value,
       "--platform",        selectPlatform.value,
-      "--output",          path.join(videoDir, videoBase + "_autoedit.mp4"),
+      "--output",          path.join(outputDir, videoBase + "_autoedit.mp4"),
     ];
 
     startRun();
