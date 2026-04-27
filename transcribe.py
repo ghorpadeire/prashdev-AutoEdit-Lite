@@ -101,18 +101,33 @@ def transcribe_video(
     segments_generator, info = model.transcribe(
         str(audio_path),
         beam_size=5,
-        language=None,      # auto-detect language
-        vad_filter=True,    # skip silent sections automatically
+        language=None,           # auto-detect language
+        vad_filter=True,         # skip silent sections automatically
+        word_timestamps=True,    # per-word timing for filler detection
     )
 
     # Convert the generator to a list of plain dicts
     segments: list[dict] = []
     for seg in segments_generator:
-        segments.append({
+        seg_dict: dict = {
             "start": round(float(seg.start), 3),
             "end":   round(float(seg.end),   3),
             "text":  seg.text.strip(),
-        })
+        }
+        try:
+            if seg.words:
+                seg_dict["words"] = [
+                    {
+                        "word":        w.word,
+                        "start":       round(float(w.start),       3),
+                        "end":         round(float(w.end),         3),
+                        "probability": round(float(w.probability), 4),
+                    }
+                    for w in seg.words
+                ]
+        except Exception:
+            pass  # graceful degradation if word alignment is unavailable
+        segments.append(seg_dict)
 
     # Clean up temp audio file
     if audio_path.exists():

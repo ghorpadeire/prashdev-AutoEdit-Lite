@@ -31,19 +31,19 @@ EDITING PHILOSOPHY
 - Respect the speaker — never alter meaning by removing critical context.
 
 ==================================================
-MANDATORY FILLER REMOVAL
+EDITORIAL FILLER GUIDANCE
 ==================================================
 
-You MUST remove or avoid selecting any segment that is heavily composed of:
+The transcript below has been automatically pre-processed to remove obvious verbal fillers
+(um, uh, ah, er, hmm) and detected false starts. Your role is editorial judgment — not
+mechanical filler detection.
 
-Verbal fillers  : "uh", "um", "ah", "ugh", "er", "hmm"
+You SHOULD still avoid selecting segments that contain:
+
 Self-corrections: "sorry", "let me start again", "let me rephrase", "I mean —" (when followed by the corrected version)
 Filler phrases  : "you know", "kind of", "sort of", "like" (non-meaningful), "basically", "literally" (non-meaningful)
-Restarts        : Any sentence the speaker started, abandoned, and cleanly re-delivered
-Dead air        : Pauses longer than 2 seconds mid-thought
 Repetitions     : Same point made twice — keep only the cleaner, more confident delivery
-
-If a sentence contains a filler word but the surrounding content is strong, prefer the sentence over removing the whole segment. Use judgment — a single "um" does not disqualify a powerful statement.
+Dead air        : Pauses longer than 2 seconds mid-thought
 
 ==================================================
 PLATFORM CONTEXT
