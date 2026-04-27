@@ -70,6 +70,39 @@ def _call_claude(
     return message.content[0].text
 
 
+def _call_claude_with_cache(
+    client,
+    full_prompt: str,
+    transcript_str: str,
+    extra_prefix: str = "",
+) -> str:
+    """
+    Send prompt with cache_control on the static instruction portion.
+
+    The static instruction template (everything before the transcript) is marked
+    ephemeral so Anthropic caches it across calls in the same session. Subsequent
+    chunks of the same video are billed at ~10% for the template portion.
+
+    Falls back to _call_claude() if the transcript can't be located in the prompt.
+    """
+    try:
+        split_idx = full_prompt.index(transcript_str)
+        static_part = (extra_prefix + full_prompt[:split_idx]).strip()
+        dynamic_part = full_prompt[split_idx:]
+    except ValueError:
+        return _call_claude(client, full_prompt, extra_prefix)
+
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": static_part, "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": dynamic_part},
+        ]}],
+    )
+    return message.content[0].text
+
+
 def _parse_and_validate_json(
     raw: str,
     video_duration: float,
@@ -175,6 +208,25 @@ def _analyze_chunk(
     platform: str = "general",
 ) -> list[dict]:
     """Run one Claude request for a single transcript chunk. Retries up to 3 times."""
+    # Rule-based filler pre-filter: strip obvious fillers before sending to Claude.
+    # Only runs when faster-whisper word timestamps are present; skips silently otherwise.
+    has_word_data = any("words" in seg and seg["words"] for seg in segments)
+    if has_word_data:
+        try:
+            from filler_detector import detect_fillers, merge_overlaps, apply_removals_to_segments
+            raw_removals = detect_fillers(segments)
+            merged_removals = merge_overlaps(sorted(raw_removals, key=lambda r: r["start"]))
+            filtered = apply_removals_to_segments(segments, merged_removals)
+            removed = len(segments) - len(filtered)
+            if removed:
+                print(
+                    f"  Rule-based pre-filter: removed {removed} filler segment(s) "
+                    f"({len(merged_removals)} filler range(s) detected)"
+                )
+            segments = filtered
+        except Exception as e:
+            print(f"  [WARNING] Filler pre-filter failed: {e} - sending full transcript to Claude")
+
     transcript_str = _format_transcript(segments)
 
     platform_label = _PLATFORM_LABELS.get(platform, "General")
@@ -196,7 +248,7 @@ def _analyze_chunk(
 
     for attempt in range(1, 4):
         try:
-            raw_response = _call_claude(client, prompt, extra_prefix=extra_prefix)
+            raw_response = _call_claude_with_cache(client, prompt, transcript_str, extra_prefix=extra_prefix)
 
             # Save raw response for debugging (overwritten each attempt)
             raw_log = logs_dir / f"claude_raw_chunk{chunk_index}.txt"
