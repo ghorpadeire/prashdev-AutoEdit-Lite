@@ -4,7 +4,7 @@ xml_export.py
 Exports Claude's kept segments as a Final Cut Pro 7 XML (XMEML) timeline
 that Adobe Premiere Pro can import as a new sequence with all cuts pre-applied.
 
-Two key fixes applied over raw OTIO output:
+Three key fixes applied over raw OTIO output:
 
 1. pathurl fix — OTIO writes a bare file path; Premiere requires a proper
    file:// URI (file:///Users/... on Mac, file:///D:/... on Windows).
@@ -14,11 +14,16 @@ Two key fixes applied over raw OTIO output:
    <video> block. We replace that empty element with a properly populated
    <samplecharacteristics> block so Premiere opens the sequence at the
    correct resolution and frame rate.
+
+3. Audio channel fix — detects the real channel count and sample rate from
+   the source video and generates matching audio tracks + channel type tags
+   (Stereo / Mono) so Premiere can link the media without "Cannot Link Media"
+   errors caused by a channel-count mismatch.
 """
 
 import re
 import subprocess
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import opentimelineio as otio
 
@@ -43,6 +48,36 @@ def _detect_fps(video_path: str) -> float:
         return 25.0
 
 
+def _detect_audio_info(video_path: str) -> tuple[int, int]:
+    """
+    Read audio channel count and sample rate from video using ffprobe.
+
+    Returns
+    -------
+    (channels, sample_rate)
+        Falls back to (2, 48000) on any failure so exports always succeed.
+    """
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=channels,sample_rate",
+        "-of", "default=noprint_wrappers=1",
+        video_path,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        channels = 2
+        sample_rate = 48000
+        for line in result.stdout.strip().splitlines():
+            if line.startswith("channels="):
+                channels = int(line.split("=")[1])
+            elif line.startswith("sample_rate="):
+                sample_rate = int(line.split("=")[1])
+        return channels, sample_rate
+    except Exception:
+        return 2, 48000
+
+
 def _to_file_uri(file_path: str) -> str:
     """
     Convert an absolute file path to a file:// URI that Premiere Pro accepts.
@@ -61,7 +96,6 @@ def _fix_media_paths(content: str, abs_path: str) -> str:
     it with the URI version in all <pathurl> elements.
     """
     uri = _to_file_uri(abs_path)
-    # Replace the posix path OTIO embedded with the file:// URI
     posix = Path(abs_path).resolve().as_posix()
     return content.replace(
         f"<pathurl>{posix}</pathurl>",
@@ -75,17 +109,21 @@ def _inject_sequence_settings(
     height: int,
     fps: float,
     abs_video_path: str,
+    num_channels: int = 2,
+    sample_rate: int = 48000,
 ) -> None:
     """
     Post-process the OTIO-generated FCP7 XML to:
     1. Replace the bare pathurl with a file:// URI (fixes Media Offline).
     2. Replace the OTIO-generated empty <format/> in the sequence-level
-       <video> block with proper resolution/fps settings so Premiere opens
-       the sequence at the correct dimensions.
-    3. Add audio format (sample rate + depth) to the <audio> section.
+       <video> block with proper resolution/fps settings.
+    3. Inject correct audio format (real sample rate + bit depth) and add
+       <audiochanneltype> tags to every audio track so Premiere can link
+       the media regardless of whether it is Mono or Stereo.
     """
     timebase = str(round(fps))
     ntsc = "TRUE" if abs(fps - round(fps)) > 0.01 else "FALSE"
+    channel_type = "Stereo" if num_channels >= 2 else "Mono"
 
     video_format_xml = (
         f"<format><samplecharacteristics>"
@@ -101,7 +139,7 @@ def _inject_sequence_settings(
     audio_format_xml = (
         f"<format><samplecharacteristics>"
         f"<depth>16</depth>"
-        f"<samplerate>48000</samplerate>"
+        f"<samplerate>{sample_rate}</samplerate>"
         f"</samplecharacteristics></format>"
     )
 
@@ -121,12 +159,9 @@ def _inject_sequence_settings(
         if video_pos != -1:
             track_pos = content.find("<track>", video_pos)
             if track_pos != -1:
-                # Extract the region between <video> and <track>
                 region = content[video_pos + 7 : track_pos]
-                # Strip any existing format elements (empty or not)
                 region = re.sub(r"<format\s*/>", "", region)
                 region = re.sub(r"<format>.*?</format>", "", region, flags=re.DOTALL)
-                # Rebuild with our format block
                 content = (
                     content[: video_pos + 7]
                     + video_format_xml
@@ -134,19 +169,16 @@ def _inject_sequence_settings(
                     + content[track_pos:]
                 )
 
-    # ── Fix 3: audio format ────────────────────────────────────────────────
-    # Find the <audio> section at the sequence level (after <media>) and
-    # insert an audio format block before the first <track> in it.
-    # We search after the <media> position to avoid clipitem <audio> elements.
+    # ── Fix 3a: inject audio format block ─────────────────────────────────
+    # Find the sequence-level <audio> block and insert a <format> element
+    # with the real sample rate before the first <track>.
     if media_pos != -1:
-        # Re-find media_pos after content may have changed
         media_pos2 = content.find("<media>")
         audio_pos = content.find("<audio>", media_pos2 if media_pos2 != -1 else 0)
         if audio_pos != -1:
             audio_track_pos = content.find("<track>", audio_pos)
             if audio_track_pos != -1:
                 audio_region = content[audio_pos + 7 : audio_track_pos]
-                # Only inject if no format already present
                 if "<format>" not in audio_region:
                     audio_region = re.sub(r"<format\s*/>", "", audio_region)
                     content = (
@@ -155,6 +187,27 @@ def _inject_sequence_settings(
                         + audio_region
                         + content[audio_track_pos:]
                     )
+
+    # ── Fix 3b: add <audiochanneltype> inside each audio <track> ──────────
+    # Re-locate the sequence-level <audio> block after potential changes above
+    # and inject <audiochanneltype>Stereo|Mono</audiochanneltype> after each
+    # opening <track> tag that does not already have one.
+    media_pos3 = content.find("<media>")
+    if media_pos3 != -1:
+        audio_start = content.find("<audio>", media_pos3)
+        audio_end   = content.find("</audio>", audio_start) if audio_start != -1 else -1
+        if audio_start != -1 and audio_end != -1:
+            audio_block = content[audio_start : audio_end + 8]
+
+            def _add_channel_type(m):
+                tag = m.group(0)  # the literal "<track>" string
+                rest = audio_block[m.start():]
+                if "<audiochanneltype>" in rest[:80]:
+                    return tag  # already annotated — leave it
+                return tag + f"<audiochanneltype>{channel_type}</audiochanneltype>"
+
+            new_audio_block = re.sub(r"<track>", _add_channel_type, audio_block)
+            content = content[:audio_start] + new_audio_block + content[audio_end + 8:]
 
     with open(xml_path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -188,21 +241,33 @@ def export_premiere_xml(
     """
     detected_fps = _detect_fps(input_video_path)
     fps = float(target_fps) if target_fps is not None else detected_fps
-    print(f"  Detected frame rate : {detected_fps:.3f} fps  |  Sequence fps: {fps:.0f}")
-    print(f"  Sequence resolution : {width}x{height}")
+    num_channels, sample_rate = _detect_audio_info(input_video_path)
+
+    print(f"  Detected frame rate  : {detected_fps:.3f} fps  |  Sequence fps: {fps:.0f}")
+    print(f"  Sequence resolution  : {width}x{height}")
+    print(f"  Audio                : {num_channels}ch @ {sample_rate} Hz"
+          f"  ({'Stereo' if num_channels >= 2 else 'Mono'})")
 
     timeline = otio.schema.Timeline(name="AutoEdit — Rough Cut")
 
     video_track = otio.schema.Track(name="Video 1", kind=otio.schema.TrackKind.Video)
-    audio_track = otio.schema.Track(name="Audio 1", kind=otio.schema.TrackKind.Audio)
     timeline.tracks.append(video_track)
-    timeline.tracks.append(audio_track)
 
-    # Use the resolved absolute path; _inject_sequence_settings will convert to URI
+    # Create one audio track per channel (A1 + A2 for stereo, just A1 for mono).
+    # This matches how Premiere Pro natively handles multi-channel media and
+    # prevents "Cannot Link Media" errors caused by channel-count mismatches.
+    audio_tracks = []
+    for i in range(max(1, num_channels)):
+        t = otio.schema.Track(
+            name=f"Audio {i + 1}",
+            kind=otio.schema.TrackKind.Audio,
+        )
+        timeline.tracks.append(t)
+        audio_tracks.append(t)
+
     abs_path = str(Path(input_video_path).resolve())
     abs_posix = Path(abs_path).as_posix()
 
-    # FCP7 adapter requires available_range on the media reference
     max_end_sec = max((seg["end"] for seg in segments), default=0.0)
     available_range = otio.opentime.TimeRange(
         start_time=otio.opentime.RationalTime(0, fps),
@@ -215,9 +280,8 @@ def export_premiere_xml(
 
     for seg in segments:
         start_frame = round(seg["start"] * fps)
-        end_frame = round(seg["end"] * fps)
+        end_frame   = round(seg["end"] * fps)
         duration_frames = end_frame - start_frame
-
         if duration_frames <= 0:
             continue
 
@@ -232,23 +296,26 @@ def export_premiere_xml(
             media_reference=media_ref,
             source_range=source_range,
         ))
-        audio_track.append(otio.schema.Clip(
-            name=label,
-            media_reference=media_ref,
-            source_range=source_range,
-        ))
+        for at in audio_tracks:
+            at.append(otio.schema.Clip(
+                name=label,
+                media_reference=media_ref,
+                source_range=source_range,
+            ))
 
     output_path = Path(output_xml_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     otio.adapters.write_to_file(timeline, str(output_path), adapter_name="fcp_xml")
 
-    # Post-process: fix pathurl, inject resolution + audio format
+    # Post-process: fix pathurl, inject resolution + real audio format/channels
     _inject_sequence_settings(
         str(output_path),
         width=width,
         height=height,
         fps=fps,
         abs_video_path=abs_path,
+        num_channels=num_channels,
+        sample_rate=sample_rate,
     )
 
     print(f"  Premiere XML saved to: {output_path}")

@@ -64,10 +64,10 @@ def _format_duration(seconds: float) -> str:
     return f"{minutes}:{secs:02d}"
 
 
-def _ensure_dirs() -> None:
-    """Create required directories if they don't exist."""
-    for d in ["input", "output", "logs", "prompts"]:
-        Path(d).mkdir(parents=True, exist_ok=True)
+def _ensure_dirs(output_path: Path) -> None:
+    """Create the output folder and a logs subfolder next to it."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    (output_path.parent / "logs").mkdir(parents=True, exist_ok=True)
 
 
 def _validate_input(input_path: Path) -> None:
@@ -164,7 +164,7 @@ def main() -> None:
     output_path = Path(args.output)
 
     # ── Startup checks ─────────────────────────────────────────────────────
-    _ensure_dirs()
+    _ensure_dirs(output_path)
     _check_ffmpeg_available()
     _validate_input(input_path)
 
@@ -199,7 +199,7 @@ def main() -> None:
     transcript_segments = transcribe_video(
         video_path=str(input_path),
         model_name=args.model,
-        logs_dir="logs",
+        logs_dir=str(output_path.parent / "logs"),
     )
 
     if not transcript_segments:
@@ -219,8 +219,8 @@ def main() -> None:
         target_duration=args.target_duration,
         aspect_ratio=args.aspect_ratio,
         platform=args.platform,
-        logs_dir="logs",
-        prompts_dir="prompts",
+        logs_dir=str(output_path.parent / "logs"),
+        prompts_dir=str(Path(__file__).parent / "prompts"),
     )
 
     if not kept_segments:

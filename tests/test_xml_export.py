@@ -11,7 +11,13 @@ from unittest.mock import patch
 import opentimelineio as otio
 import pytest
 
-from xml_export import _detect_fps, _inject_sequence_settings, _to_file_uri, export_premiere_xml
+from xml_export import (
+    _detect_audio_info,
+    _detect_fps,
+    _inject_sequence_settings,
+    _to_file_uri,
+    export_premiere_xml,
+)
 
 
 FAKE_SEGMENTS = [
@@ -20,10 +26,11 @@ FAKE_SEGMENTS = [
 ]
 
 
-def _export(tmp_path, segments=None):
-    """Helper: run export with mocked fps=25 and return the xml path."""
+def _export(tmp_path, segments=None, channels=2, sample_rate=44100):
+    """Helper: run export with mocked fps + audio info, return the xml path."""
     out = tmp_path / "output.xml"
-    with patch("xml_export._detect_fps", return_value=25.0):
+    with patch("xml_export._detect_fps", return_value=25.0), \
+         patch("xml_export._detect_audio_info", return_value=(channels, sample_rate)):
         export_premiere_xml("/fake/video.mp4", segments or FAKE_SEGMENTS, str(out))
     return out
 
@@ -162,6 +169,73 @@ class TestExportPremiereXml:
         assert "<format/>" not in content
 
     def test_audio_format_injected(self, tmp_path):
-        out = _export(tmp_path)
+        # _export mocks sample_rate=44100, so the XML must reflect that
+        out = _export(tmp_path, sample_rate=44100)
+        content = out.read_text()
+        assert "<samplerate>44100</samplerate>" in content
+
+    def test_audio_format_uses_real_sample_rate(self, tmp_path):
+        out = _export(tmp_path, sample_rate=48000)
         content = out.read_text()
         assert "<samplerate>48000</samplerate>" in content
+
+
+class TestDetectAudioInfo:
+    def test_fallback_on_ffprobe_failure(self):
+        with patch("xml_export.subprocess.run", side_effect=Exception("not found")):
+            channels, sample_rate = _detect_audio_info("fake.mp4")
+        assert channels == 2
+        assert sample_rate == 48000
+
+    def test_parses_stereo(self):
+        mock = type("R", (), {"stdout": "channels=2\nsample_rate=44100\n", "returncode": 0})()
+        with patch("xml_export.subprocess.run", return_value=mock):
+            channels, sample_rate = _detect_audio_info("fake.mp4")
+        assert channels == 2
+        assert sample_rate == 44100
+
+    def test_parses_mono(self):
+        mock = type("R", (), {"stdout": "channels=1\nsample_rate=48000\n", "returncode": 0})()
+        with patch("xml_export.subprocess.run", return_value=mock):
+            channels, sample_rate = _detect_audio_info("fake.mp4")
+        assert channels == 1
+        assert sample_rate == 48000
+
+    def test_fallback_on_empty_output(self):
+        mock = type("R", (), {"stdout": "", "returncode": 0})()
+        with patch("xml_export.subprocess.run", return_value=mock):
+            channels, sample_rate = _detect_audio_info("fake.mp4")
+        assert channels == 2
+        assert sample_rate == 48000
+
+
+class TestAudioChannelExport:
+    def test_stereo_creates_two_audio_tracks(self, tmp_path):
+        out = _export(tmp_path, channels=2)
+        timeline = otio.adapters.read_from_file(str(out), adapter_name="fcp_xml")
+        audio_tracks = [t for t in timeline.tracks if t.kind == otio.schema.TrackKind.Audio]
+        assert len(audio_tracks) == 2
+
+    def test_mono_creates_one_audio_track(self, tmp_path):
+        out = _export(tmp_path, channels=1)
+        timeline = otio.adapters.read_from_file(str(out), adapter_name="fcp_xml")
+        audio_tracks = [t for t in timeline.tracks if t.kind == otio.schema.TrackKind.Audio]
+        assert len(audio_tracks) == 1
+
+    def test_stereo_injects_audiochanneltype_stereo(self, tmp_path):
+        out = _export(tmp_path, channels=2)
+        content = out.read_text()
+        assert "<audiochanneltype>Stereo</audiochanneltype>" in content
+
+    def test_mono_injects_audiochanneltype_mono(self, tmp_path):
+        out = _export(tmp_path, channels=1)
+        content = out.read_text()
+        assert "<audiochanneltype>Mono</audiochanneltype>" in content
+
+    def test_stereo_tracks_have_clips(self, tmp_path):
+        out = _export(tmp_path, channels=2)
+        timeline = otio.adapters.read_from_file(str(out), adapter_name="fcp_xml")
+        audio_tracks = [t for t in timeline.tracks if t.kind == otio.schema.TrackKind.Audio]
+        for track in audio_tracks:
+            clips = [c for c in track if isinstance(c, otio.schema.Clip)]
+            assert len(clips) == len(FAKE_SEGMENTS)
