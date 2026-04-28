@@ -12,6 +12,7 @@ import opentimelineio as otio
 import pytest
 
 from xml_export import (
+    _build_file_audio_xml,
     _detect_audio_info,
     _detect_fps,
     _inject_sequence_settings,
@@ -239,3 +240,73 @@ class TestAudioChannelExport:
         for track in audio_tracks:
             clips = [c for c in track if isinstance(c, otio.schema.Clip)]
             assert len(clips) == len(FAKE_SEGMENTS)
+
+
+class TestBuildFileAudioXml:
+    def test_mono_channelcount(self):
+        xml = _build_file_audio_xml(1)
+        assert "<channelcount>1</channelcount>" in xml
+
+    def test_mono_label(self):
+        xml = _build_file_audio_xml(1)
+        assert "<channellabel>mono</channellabel>" in xml
+
+    def test_mono_source_channel(self):
+        xml = _build_file_audio_xml(1)
+        assert "<sourcechannel>1</sourcechannel>" in xml
+
+    def test_stereo_channelcount(self):
+        xml = _build_file_audio_xml(2)
+        assert "<channelcount>2</channelcount>" in xml
+
+    def test_stereo_left_label(self):
+        xml = _build_file_audio_xml(2)
+        assert "<channellabel>left</channellabel>" in xml
+
+    def test_stereo_right_label(self):
+        xml = _build_file_audio_xml(2)
+        assert "<channellabel>right</channellabel>" in xml
+
+    def test_stereo_source_channels(self):
+        xml = _build_file_audio_xml(2)
+        assert "<sourcechannel>1</sourcechannel>" in xml
+        assert "<sourcechannel>2</sourcechannel>" in xml
+
+    def test_multichannel_count(self):
+        xml = _build_file_audio_xml(6)
+        assert "<channelcount>6</channelcount>" in xml
+        assert xml.count("<audiochannel>") == 6
+
+    def test_output_is_valid_xml(self):
+        for ch in (1, 2, 4, 6):
+            ET.fromstring(_build_file_audio_xml(ch))  # raises on invalid XML
+
+
+class TestFileLevelAudioInjection:
+    """Verify <audio/> in file-level <media> is replaced with full channel declaration."""
+
+    def test_empty_audio_element_replaced(self, tmp_path):
+        out = _export(tmp_path, channels=2)
+        content = out.read_text()
+        assert "<audio/>" not in content
+
+    def test_stereo_channelcount_in_output(self, tmp_path):
+        out = _export(tmp_path, channels=2)
+        content = out.read_text()
+        assert "<channelcount>2</channelcount>" in content
+
+    def test_mono_channelcount_in_output(self, tmp_path):
+        out = _export(tmp_path, channels=1)
+        content = out.read_text()
+        assert "<channelcount>1</channelcount>" in content
+
+    def test_stereo_channel_labels_in_output(self, tmp_path):
+        out = _export(tmp_path, channels=2)
+        content = out.read_text()
+        assert "<channellabel>left</channellabel>" in content
+        assert "<channellabel>right</channellabel>" in content
+
+    def test_mono_channel_label_in_output(self, tmp_path):
+        out = _export(tmp_path, channels=1)
+        content = out.read_text()
+        assert "<channellabel>mono</channellabel>" in content

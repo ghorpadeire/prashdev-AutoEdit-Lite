@@ -78,6 +78,31 @@ def _detect_audio_info(video_path: str) -> tuple[int, int]:
         return 2, 48000
 
 
+def _build_file_audio_xml(channel_count: int) -> str:
+    """
+    Build the <audio> element for the file-level <media> block.
+
+    Declares the source file's channel count and individual channel labels
+    so Premiere can link the media without a channel-count mismatch.
+    """
+    if channel_count == 1:
+        return (
+            "<audio>"
+            "<channelcount>1</channelcount>"
+            "<audiochannel><sourcechannel>1</sourcechannel>"
+            "<channellabel>mono</channellabel></audiochannel>"
+            "</audio>"
+        )
+    labels = ["left", "right", "C", "LFE", "Ls", "Rs"]
+    ch_xml = "".join(
+        f"<audiochannel><sourcechannel>{i}</sourcechannel>"
+        f"<channellabel>{labels[i - 1] if i - 1 < len(labels) else f'A{i}'}</channellabel>"
+        f"</audiochannel>"
+        for i in range(1, channel_count + 1)
+    )
+    return f"<audio><channelcount>{channel_count}</channelcount>{ch_xml}</audio>"
+
+
 def _to_file_uri(file_path: str) -> str:
     """
     Convert an absolute file path to a file:// URI that Premiere Pro accepts.
@@ -115,11 +140,14 @@ def _inject_sequence_settings(
     """
     Post-process the OTIO-generated FCP7 XML to:
     1. Replace the bare pathurl with a file:// URI (fixes Media Offline).
-    2. Replace the OTIO-generated empty <format/> in the sequence-level
-       <video> block with proper resolution/fps settings.
-    3. Inject correct audio format (real sample rate + bit depth) and add
-       <audiochanneltype> tags to every audio track so Premiere can link
-       the media regardless of whether it is Mono or Stereo.
+    2. Replace the empty <format/> in the sequence-level <video> block with
+       proper resolution/fps settings.
+    3. Inject correct audio format (real sample rate) into the sequence-level
+       <audio> section.
+    4. Add <audiochanneltype>Stereo|Mono</audiochanneltype> to each audio track.
+    5. Replace OTIO's empty <audio/> in every file-level <media> block with a
+       full <channelcount> + <audiochannel> declaration (done last to avoid
+       confusing the sequence-level <audio> searches in steps 3/4).
     """
     timebase = str(round(fps))
     ntsc = "TRUE" if abs(fps - round(fps)) > 0.01 else "FALSE"
@@ -150,9 +178,6 @@ def _inject_sequence_settings(
     content = _fix_media_paths(content, abs_video_path)
 
     # ── Fix 2: sequence-level video format ────────────────────────────────
-    # Find the FIRST <media> element (sequence level, not inside clipitem).
-    # Inside it, find <video>, then replace everything between <video> and
-    # the first <track> (OTIO puts an empty <format/> there).
     media_pos = content.find("<media>")
     if media_pos != -1:
         video_pos = content.find("<video>", media_pos)
@@ -169,9 +194,7 @@ def _inject_sequence_settings(
                     + content[track_pos:]
                 )
 
-    # ── Fix 3a: inject audio format block ─────────────────────────────────
-    # Find the sequence-level <audio> block and insert a <format> element
-    # with the real sample rate before the first <track>.
+    # ── Fix 4a: sequence-level audio format block ─────────────────────────
     if media_pos != -1:
         media_pos2 = content.find("<media>")
         audio_pos = content.find("<audio>", media_pos2 if media_pos2 != -1 else 0)
@@ -188,10 +211,7 @@ def _inject_sequence_settings(
                         + content[audio_track_pos:]
                     )
 
-    # ── Fix 3b: add <audiochanneltype> inside each audio <track> ──────────
-    # Re-locate the sequence-level <audio> block after potential changes above
-    # and inject <audiochanneltype>Stereo|Mono</audiochanneltype> after each
-    # opening <track> tag that does not already have one.
+    # ── Fix 4b: <audiochanneltype> inside each sequence-level audio <track> ─
     media_pos3 = content.find("<media>")
     if media_pos3 != -1:
         audio_start = content.find("<audio>", media_pos3)
@@ -208,6 +228,14 @@ def _inject_sequence_settings(
 
             new_audio_block = re.sub(r"<track>", _add_channel_type, audio_block)
             content = content[:audio_start] + new_audio_block + content[audio_end + 8:]
+
+    # ── Fix 5: file-level <audio/> → channel declaration ──────────────────
+    # Done last so the <audio> string it introduces doesn't confuse the
+    # sequence-level <audio> searches in Fixes 3/4a/4b above.
+    # OTIO writes <audio/> inside each <file><media> block; Premiere reads
+    # this to verify channel count before linking the media — an empty element
+    # defaults to 1ch and causes "Cannot Link Media" for stereo sources.
+    content = content.replace("<audio/>", _build_file_audio_xml(num_channels))
 
     with open(xml_path, "w", encoding="utf-8") as f:
         f.write(content)
