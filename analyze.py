@@ -157,7 +157,14 @@ def _parse_and_validate_json(
         if start >= end:
             continue
 
-        validated.append({"start": round(start, 3), "end": round(end, 3), "reason": reason})
+        importance = int(seg.get("importance", 3))
+        importance = max(1, min(5, importance))   # clamp to [1, 5]
+        validated.append({
+            "start": round(start, 3),
+            "end": round(end, 3),
+            "reason": reason,
+            "importance": importance,
+        })
         prev_end = end
 
     return validated
@@ -165,20 +172,25 @@ def _parse_and_validate_json(
 
 _PLATFORM_CONTEXT = {
     "reels": (
-        "Instagram Reels: Hook the viewer in the first 3 seconds — open with the strongest, "
-        "most surprising or relatable statement. Pacing should feel snappy. Subtitles are "
-        "essential (most viewers watch without sound). End on an emotion, a revelation, or "
-        "a clear takeaway. Avoid slow build-ups."
+        "Instagram Reels: The first 0–3 seconds are the entire game — open mid-thought or with "
+        "the most surprising statement in the whole video. Never open with a greeting. "
+        "Pacing must feel snappy; every cut should land on a natural speech beat. "
+        "Subtitles are essential (most viewers watch without sound). "
+        "End on an emotion, a revelation, or a clear actionable takeaway. Avoid slow build-ups."
     ),
     "tiktok": (
-        "TikTok: Immediate value is non-negotiable — the first 2 seconds must give the viewer "
-        "a reason to stay. High energy, direct address, and frequent re-engagement moments "
-        "(questions, surprising facts). End with a satisfying conclusion or cliffhanger."
+        "TikTok: The first 2 seconds must give the viewer a concrete reason to stay — a bold "
+        "claim, a surprising fact, or a question they can't ignore. Re-engage every 10–15 "
+        "seconds with a new hook, question, or surprising reveal; viewers who reach the 8-second "
+        "mark almost always finish. High energy, direct address. End with a satisfying conclusion "
+        "or a cliffhanger that invites re-watches."
     ),
     "shorts": (
-        "YouTube Shorts: Viewers skew educational and value clarity. Open with the question "
-        "or problem, deliver the answer step by step, close with a memorable summary. Pacing "
-        "can be slightly slower than Reels/TikTok but still faster than long-form."
+        "YouTube Shorts: Viewers skew educational and value clarity over speed. Open with the "
+        "core question or problem in the first 3 seconds. Deliver the answer step by step — "
+        "every 20 seconds should introduce a new idea or sub-point, not just elaboration of the "
+        "previous one. Close with a memorable one-sentence summary. Pacing can be slightly "
+        "slower than Reels/TikTok but must still feel faster than long-form YouTube."
     ),
     "general": (
         "General / Premiere edit: Focus on storytelling clarity and pacing. No platform-specific "
@@ -206,6 +218,7 @@ def _analyze_chunk(
     target_duration: int = 90,
     aspect_ratio: str = "16:9",
     platform: str = "general",
+    gap_threshold: float = 0.8,
 ) -> list[dict]:
     """Run one Claude request for a single transcript chunk. Retries up to 3 times."""
     # Rule-based filler pre-filter: strip obvious fillers before sending to Claude.
@@ -214,7 +227,7 @@ def _analyze_chunk(
     if has_word_data:
         try:
             from filler_detector import detect_fillers, merge_overlaps, apply_removals_to_segments
-            raw_removals = detect_fillers(segments)
+            raw_removals = detect_fillers(segments, gap_threshold=gap_threshold)
             merged_removals = merge_overlaps(sorted(raw_removals, key=lambda r: r["start"]))
             filtered = apply_removals_to_segments(segments, merged_removals)
             removed = len(segments) - len(filtered)
@@ -256,15 +269,23 @@ def _analyze_chunk(
 
             validated = _parse_and_validate_json(raw_response, video_duration, chunk_start_offset)
 
-            # Enforce duration budget — trim from the end if Claude overran
+            # Enforce duration budget — remove lowest-importance segments first
             min_duration = max(10, round(target_duration * 0.85))
             max_duration = round(target_duration * 1.1)
             total = sum(s["end"] - s["start"] for s in validated)
             if total > max_duration and validated:
+                n_before = len(validated)
+                # Sort: lowest importance first; ties broken by shortest segment first
+                validated.sort(key=lambda s: (s.get("importance", 3), -(s["end"] - s["start"])))
                 while validated and total > max_duration:
-                    removed = validated.pop()
+                    removed = validated.pop(0)
                     total -= (removed["end"] - removed["start"])
-                print(f"  [Duration enforcement] Trimmed to {total:.1f}s (target: {target_duration}s, max: {max_duration}s)")
+                validated.sort(key=lambda s: s["start"])   # restore chronological order
+                print(
+                    f"  [Duration enforcement] Trimmed to {total:.1f}s "
+                    f"(removed {n_before - len(validated)} low-importance segment(s), "
+                    f"target: {target_duration}s, max: {max_duration}s)"
+                )
 
             # Save clean JSON
             clean_log = logs_dir / f"claude_clean_chunk{chunk_index}.json"
@@ -294,6 +315,7 @@ def analyze_transcript(
     platform: str = "general",
     logs_dir: str = "logs",
     prompts_dir: str = "prompts",
+    gap_threshold: float = 0.8,
 ) -> list[dict]:
     """
     Send the transcript to Claude and return a validated list of segments to keep.
@@ -351,6 +373,7 @@ def analyze_transcript(
             client, segments, quality_mode, video_duration,
             prompt_template, logs_path,
             target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
+            gap_threshold=gap_threshold,
         )
     else:
         print(f"  Transcript size: ~{estimated_tokens:,} tokens - sending in one request.")
@@ -359,6 +382,7 @@ def analyze_transcript(
             prompt_template, chunk_start_offset=0.0,
             logs_dir=logs_path, chunk_index=0,
             target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
+            gap_threshold=gap_threshold,
         )
 
     # Merge the main raw/clean logs from chunk 0 into the standard names
@@ -384,6 +408,7 @@ def _analyze_in_chunks(
     target_duration: int = 90,
     aspect_ratio: str = "16:9",
     platform: str = "general",
+    gap_threshold: float = 0.8,
 ) -> list[dict]:
     """Split segments into 10-minute chunks and process each separately."""
     chunks: list[tuple[float, list[dict]]] = []
@@ -414,6 +439,7 @@ def _analyze_in_chunks(
             prompt_template, chunk_start_offset=chunk_offset,
             logs_dir=logs_path, chunk_index=i,
             target_duration=target_duration, aspect_ratio=aspect_ratio, platform=platform,
+            gap_threshold=gap_threshold,
         )
         all_kept.extend(kept)
 

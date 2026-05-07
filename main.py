@@ -151,6 +151,24 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--language", default=None,
+        metavar="CODE",
+        help=(
+            "Whisper language code (e.g. 'en', 'es', 'fr'). "
+            "Skips auto-detection — faster and more accurate for known-language content. "
+            "Default: auto-detect."
+        ),
+    )
+    parser.add_argument(
+        "--gap-threshold", type=float, default=0.8,
+        metavar="SECONDS",
+        help=(
+            "Silence gap (in seconds) treated as a filler pause and removed. "
+            "Lower values remove shorter pauses (e.g. 0.5 for fast-paced content). "
+            "Default: 0.8"
+        ),
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Transcribe and get Claude's plan, but do NOT cut the video.",
     )
@@ -175,7 +193,9 @@ def main() -> None:
     print(f"  Input   : {input_path}")
     print(f"  Model   : {args.model}")
     print(f"  Quality : {args.quality}")
+    lang_display = args.language if args.language else "auto"
     print(f"  Target  : {args.target_duration}s  |  {args.aspect_ratio}  |  {args.platform}")
+    print(f"  Language: {lang_display}  |  Gap threshold: {args.gap_threshold}s")
     if args.dry_run:
         print("  Mode    : DRY RUN (no video cutting)")
     elif args.mode == "premiere":
@@ -200,6 +220,7 @@ def main() -> None:
         video_path=str(input_path),
         model_name=args.model,
         logs_dir=str(output_path.parent / "logs"),
+        language=args.language,
     )
 
     if not transcript_segments:
@@ -221,6 +242,7 @@ def main() -> None:
         platform=args.platform,
         logs_dir=str(output_path.parent / "logs"),
         prompts_dir=str(Path(__file__).parent / "prompts"),
+        gap_threshold=args.gap_threshold,
     )
 
     if not kept_segments:
