@@ -52,6 +52,8 @@ def transcribe_video(
     video_path: str,
     model_name: str,
     logs_dir: str = "logs",
+    language: str | None = None,
+    initial_prompt: str = "A talking-head video. Clear spoken speech.",
 ) -> list[dict]:
     """
     Transcribe a video file and return a list of timed segments.
@@ -66,6 +68,13 @@ def transcribe_video(
         Whisper model size: tiny | base | small | medium | large
     logs_dir : str
         Directory where transcript.json will be saved.
+    language : str | None
+        BCP-47 language code (e.g. "en"). None = auto-detect (default).
+        Passing the language skips Whisper's language-detection step and
+        reduces transcription errors for known-language content.
+    initial_prompt : str
+        Domain hint fed to Whisper to anchor it to the expected speech style.
+        Reduces errors on filler words and domain-specific vocabulary.
 
     Returns
     -------
@@ -97,13 +106,16 @@ def transcribe_video(
 
     model = WhisperModel(model_name, device="cpu", compute_type="int8")
 
-    print("  Transcribing... (this may take a while for long videos)")
+    lang_display = language if language else "auto-detect"
+    print(f"  Transcribing... (language: {lang_display})")
     segments_generator, info = model.transcribe(
         str(audio_path),
         beam_size=5,
-        language=None,           # auto-detect language
-        vad_filter=True,         # skip silent sections automatically
-        word_timestamps=True,    # per-word timing for filler detection
+        language=language,
+        vad_filter=True,
+        word_timestamps=True,
+        initial_prompt=initial_prompt,
+        condition_on_previous_text=True,
     )
 
     # Convert the generator to a list of plain dicts

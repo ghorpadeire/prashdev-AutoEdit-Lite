@@ -51,6 +51,11 @@ PLATFORM CONTEXT
 
 {platform_context}
 
+HOOK RULE (all platforms):
+Never open with a greeting ("Hey guys", "Welcome back", "Hi everyone"). Start in the middle
+of a thought, with a bold claim, or with the most surprising statement in the whole video.
+The first sentence must make the viewer feel they would miss something important if they swiped away.
+
 ==================================================
 QUALITY MODE: {quality_mode}
 ==================================================
@@ -100,11 +105,18 @@ IMPORTANT:
 JSON SCHEMA:
 {
   "segments_to_keep": [
-    {"start": <float>, "end": <float>, "reason": "<brief reason>"},
+    {"start": <float>, "end": <float>, "reason": "<brief reason>", "importance": <int 1-5>},
     ...
   ],
   "summary": "<one sentence describing the edit overall>"
 }
+
+IMPORTANCE SCALE:
+- 5 = Essential — core argument, strongest hook, or key proof. Never cut.
+- 4 = Strong — clear value, good delivery. Cut only as a last resort.
+- 3 = Useful — adds context or flow. Cut if budget is tight.
+- 2 = Weak — minor elaboration or transitional. Cut before anything rated 3+.
+- 1 = Filler — weakest segment in the selection. Cut first.
 
 SEGMENT VALIDATION RULES:
 - start must always be less than end
@@ -114,6 +126,7 @@ SEGMENT VALIDATION RULES:
 - No overlapping segments
 - All timestamps must be within the video duration
 - Total selected duration must be within the acceptable range stated above
+- importance must be an integer between 1 and 5 (inclusive)
 
 ==================================================
 FEW-SHOT EXAMPLES
@@ -131,7 +144,7 @@ Input transcript:
 Quality mode: aggressive | Target: 90s | Platform: Instagram Reels
 
 Correct output:
-{"segments_to_keep": [{"start": 3.1, "end": 8.4, "reason": "strong opening statement, no filler, hooks the viewer"}, {"start": 13.2, "end": 17.5, "reason": "clean confident delivery of the core advice"}, {"start": 17.5, "end": 22.0, "reason": "specific personal proof — strong closer"}], "summary": "Removed filler-heavy opener and duplicate phone take; kept hook, advice, and proof for a tight Reels-ready clip."}
+{"segments_to_keep": [{"start": 3.1, "end": 8.4, "reason": "strong opening statement, no filler, hooks the viewer", "importance": 5}, {"start": 13.2, "end": 17.5, "reason": "clean confident delivery of the core advice", "importance": 4}, {"start": 17.5, "end": 22.0, "reason": "specific personal proof — strong closer", "importance": 5}], "summary": "Removed filler-heavy opener and duplicate phone take; kept hook, advice, and proof for a tight Reels-ready clip."}
 
 --- EXAMPLE 2 — Vertical social clip (60s target, balanced mode) ---
 
@@ -146,4 +159,4 @@ Input transcript:
 Quality mode: balanced | Target: 60s | Platform: TikTok
 
 Correct output:
-{"segments_to_keep": [{"start": 5.2, "end": 9.8, "reason": "strong hook question — draws viewer in immediately"}, {"start": 9.8, "end": 16.3, "reason": "punchy counter-intuitive answer — single um tolerated for impact"}, {"start": 21.7, "end": 28.0, "reason": "clean re-delivery of systems definition after false start removed"}, {"start": 28.0, "end": 34.5, "reason": "powerful contrast close — works as final beat"}], "summary": "Removed generic opener and the false-start take; kept the question, the core answer, clean definition, and strong close within the 60s target."}
+{"segments_to_keep": [{"start": 5.2, "end": 9.8, "reason": "strong hook question — draws viewer in immediately", "importance": 5}, {"start": 9.8, "end": 16.3, "reason": "punchy counter-intuitive answer — single um tolerated for impact", "importance": 5}, {"start": 21.7, "end": 28.0, "reason": "clean re-delivery of systems definition after false start removed", "importance": 4}, {"start": 28.0, "end": 34.5, "reason": "powerful contrast close — works as final beat", "importance": 5}], "summary": "Removed generic opener and the false-start take; kept the question, the core answer, clean definition, and strong close within the 60s target."}
