@@ -61,7 +61,8 @@ internal static class Logger
     {
         Directory.CreateDirectory(Paths.LogsDir);
         LogPath = Path.Combine(Paths.LogsDir, "launcher.log");
-        _writer = new StreamWriter(LogPath, append: true) { AutoFlush = true };
+        // UTF-8 so em-dashes etc. in messages survive the round trip.
+        _writer = new StreamWriter(LogPath, append: true, System.Text.Encoding.UTF8) { AutoFlush = true };
         Write("");
         Write("=== launcher started ===");
         Write($"timestamp:   {DateTime.Now:O}");
@@ -164,25 +165,45 @@ internal static class Launcher
             return 3;
         }
 
-        if (!ApiKey.EnsurePresent())
-        {
-            Logger.Write("API key not provided.");
-            UI.Error("No Anthropic API key configured. Set ANTHROPIC_API_KEY in:\n" + Paths.EnvFile);
-            return 4;
-        }
+        // --help / -h / --version are introspection-only; don't gate them
+        // on an API key or trigger a 1.5 GB model download.
+        bool informational = IsInformationalInvocation(args);
+        Logger.Write($"informational: {informational}");
 
-        var model = ExtractModelArg(args);
-        if (!ModelCache.Has(model))
+        if (!informational)
         {
-            Logger.Write($"Model '{model}' not cached — preloading.");
-            if (!ModelPreload.Run(model))
+            if (!ApiKey.EnsurePresent())
             {
-                UI.Error("Whisper model download failed. Check your internet connection.");
-                return 5;
+                Logger.Write("API key not provided.");
+                UI.Error("No Anthropic API key configured. Set ANTHROPIC_API_KEY in:\n" + Paths.EnvFile);
+                return 4;
+            }
+
+            var model = ExtractModelArg(args);
+            if (!ModelCache.Has(model))
+            {
+                Logger.Write($"Model '{model}' not cached -- preloading.");
+                if (!ModelPreload.Run(model))
+                {
+                    UI.Error("Whisper model download failed. Check your internet connection.");
+                    return 5;
+                }
             }
         }
 
         return SpawnPython(args);
+    }
+
+    private static bool IsInformationalInvocation(string[] args)
+    {
+        foreach (var a in args)
+        {
+            if (string.Equals(a, "--help", StringComparison.Ordinal) ||
+                string.Equals(a, "-h",     StringComparison.Ordinal) ||
+                string.Equals(a, "--version", StringComparison.Ordinal))
+                return true;
+        }
+        return false;
     }
 
     private static string ExtractModelArg(string[] args)
