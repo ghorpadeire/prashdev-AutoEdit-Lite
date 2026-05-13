@@ -1,13 +1,13 @@
-; ============================================================================
-;  preflight.iss — Pascal [Code] helpers for AutoEditLite.iss
-;
-;  Provides:
-;    - VCRedistNeeded()        Check for VC++ 2015-2022 x64 runtime
-;    - IsPremiereInstalled()   Triple-check Premiere detection
-;    - PreflightChecks()       Disk + Windows version gate
-;    - API key wizard page     Collects ANTHROPIC_API_KEY, writes .env
-;    - CurUninstallStepChanged Offers full wipe of %APPDATA%\AutoEditLite
-; ============================================================================
+// ============================================================================
+//  preflight.iss — Pascal [Code] helpers for AutoEditLite.iss
+//
+//  Provides:
+//    - VCRedistNeeded()        Check for VC++ 2015-2022 x64 runtime
+//    - IsPremiereInstalled()   Triple-check Premiere detection
+//    - PreflightChecks()       Disk + Windows version gate
+//    - API key wizard page     Collects ANTHROPIC_API_KEY, writes .env
+//    - CurUninstallStepChanged Offers full wipe of %APPDATA%\AutoEditLite
+// ============================================================================
 
 const
   VCRedistKey = 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
@@ -106,14 +106,15 @@ end;
 // ---------------------------------------------------------------------------
 function PreflightChecks(): Boolean;
 var
-  FreeMB: Int64;
-  TotalMB: Int64;
+  FreeMB: Cardinal;
+  TotalMB: Cardinal;
   TargetDrive: String;
 begin
   Result := True;
 
   // Need ~600 MB for the bundled install + headroom for the 1.5 GB model
   // cache the user will download on first run. 4 GB total is comfortable.
+  // GetSpaceOnDisk signature: (DriveRoot, InMegabytes, var Free, var Total: Cardinal).
   TargetDrive := ExtractFileDrive(ExpandConstant('{localappdata}'));
   if GetSpaceOnDisk(TargetDrive, True, FreeMB, TotalMB) then
   begin

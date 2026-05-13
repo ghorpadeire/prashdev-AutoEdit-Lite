@@ -195,14 +195,42 @@ foreach ($variant in @('AutoEditLite','AutoEditLite-CLI')) {
 
 # ── Step 8: Run Inno Setup ──────────────────────────────────────────────────
 Write-Step "Running Inno Setup compiler"
+
+# Winget installs Inno Setup per-user by default (under %LocalAppData%);
+# older / machine-wide installs land under %ProgramFiles%; chocolatey under
+# %ProgramData%. Probe all four common locations, then the registry, then PATH.
 $iscc = $null
-foreach ($candidate in @(
+$candidates = @(
+    "$env:LocalAppData\Programs\Inno Setup 6\ISCC.exe",
     "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-)) {
-    if (Test-Path $candidate) { $iscc = $candidate; break }
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "$env:ProgramData\chocolatey\bin\ISCC.exe"
+)
+foreach ($candidate in $candidates) {
+    if ($candidate -and (Test-Path $candidate)) { $iscc = $candidate; break }
 }
-if (-not $iscc) { Fail "ISCC.exe not found. Install Inno Setup 6: https://jrsoftware.org/isdl.php" }
+
+if (-not $iscc) {
+    # Registry: HKCU for per-user installs, HKLM for machine-wide
+    foreach ($hive in @('HKCU:', 'HKLM:')) {
+        $regPath = "$hive\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1"
+        try {
+            $loc = (Get-ItemProperty -Path $regPath -ErrorAction Stop).InstallLocation
+            if ($loc) {
+                $candidate = Join-Path $loc 'ISCC.exe'
+                if (Test-Path $candidate) { $iscc = $candidate; break }
+            }
+        } catch {}
+    }
+}
+
+if (-not $iscc) {
+    $cmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
+    if ($cmd) { $iscc = $cmd.Source }
+}
+
+if (-not $iscc) { Fail "ISCC.exe not found. Install Inno Setup 6: winget install JRSoftware.InnoSetup" }
+Write-OK "iscc: $iscc"
 
 & $iscc (Join-Path $installerDir 'AutoEditLite.iss')
 if ($LASTEXITCODE -ne 0) { Fail "Inno Setup failed" }
