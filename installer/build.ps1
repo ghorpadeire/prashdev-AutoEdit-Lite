@@ -47,6 +47,11 @@ $PythonEmbedUrl = 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-
 $GetPipUrl      = 'https://bootstrap.pypa.io/get-pip.py'
 $FfmpegUrl      = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip'
 $VCRedistUrl    = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'
+# ZXPSignCmd — Adobe's free CEP-extension signing tool. Needed because
+# Premiere Pro 2024+ enforces signature verification even for locally
+# installed extensions; PlayerDebugMode=1 no longer fully bypasses it.
+# Distributed as a single .exe under the CEP-Resources repo.
+$ZxpSignUrl     = 'https://github.com/Adobe-CEP/CEP-Resources/raw/master/ZXPSignCMD/4.1.103/win64/ZXPSignCmd.exe'
 
 $env:AUTOEDIT_VERSION = $Version
 
@@ -174,12 +179,53 @@ Write-OK "app\ staged ($($pyFiles.Count) modules + prompts\)"
 
 # ── Step 6b: Premiere CEP extension (the panel that appears in Premiere) ────
 Write-Step "Staging Premiere CEP extension"
-$cepDst = Join-Path $buildDir 'cep\com.autoedit.premiere'
-$cepSrc = Join-Path $repoRoot 'premiere-plugin\com.autoedit.premiere'
+$cepStage = Join-Path $buildDir 'cep\com.autoedit.premiere'
+$cepSrc   = Join-Path $repoRoot 'premiere-plugin\com.autoedit.premiere'
 if (-not (Test-Path $cepSrc)) { Fail "premiere-plugin source missing at $cepSrc" }
-New-Item -ItemType Directory -Path $cepDst -Force | Out-Null
-Copy-Item -Path "$cepSrc\*" -Destination $cepDst -Recurse -Force
-Write-OK "Premiere CEP extension staged at build\cep\com.autoedit.premiere\"
+New-Item -ItemType Directory -Path $cepStage -Force | Out-Null
+Copy-Item -Path "$cepSrc\*" -Destination $cepStage -Recurse -Force
+Write-OK "raw CEP staged"
+
+# ── Step 6c: Sign the CEP extension ─────────────────────────────────────────
+# Premiere Pro 2024+ verifies extension signatures. PlayerDebugMode=1 lets
+# Premiere TRUST a self-signed cert but does NOT skip the signature check
+# itself — so an unsigned folder is rejected with
+#   "Signature verification failed for extension <id>"
+# Use Adobe's free ZXPSignCmd to sign with a self-signed cert (cached in
+# .cache so dev builds are reproducible and quick).
+Write-Step "Signing CEP extension"
+$zxpExe = Get-Cached -Url $ZxpSignUrl -FileName 'ZXPSignCmd.exe'
+$zxp = Get-Item $zxpExe
+
+$certPath = Join-Path $cacheDir 'autoedit-selfsigned.p12'
+$certPass = 'autoeditlite'   # not a secret — cert is for build-time signing only
+if (-not (Test-Path $certPath)) {
+    & $zxp.FullName -selfSignedCert US California AutoEdit AutoEdit-Lite $certPass $certPath
+    if (-not (Test-Path $certPath)) { Fail "self-signed cert generation failed" }
+    Write-OK "self-signed cert generated -> $certPath"
+} else {
+    Write-OK "self-signed cert (cached)"
+}
+
+$signedZxp = Join-Path $buildDir 'cep-signed\com.autoedit.premiere.zxp'
+$signedDir = Join-Path $buildDir 'cep-signed\com.autoedit.premiere'
+New-Item -ItemType Directory -Path (Split-Path $signedZxp -Parent) -Force | Out-Null
+# No -tsa — timestamping needs a network round-trip that flakes on CI runners,
+# and self-signed dev certs don't gain anything from timestamping.
+& $zxp.FullName -sign $cepStage $signedZxp $certPath $certPass
+if (-not (Test-Path $signedZxp)) { Fail "ZXPSignCmd -sign did not produce $signedZxp" }
+
+# .zxp is a ZIP under the hood. PowerShell's Expand-Archive only accepts
+# .zip extensions, so copy then extract.
+if (Test-Path $signedDir) { Remove-Item $signedDir -Recurse -Force }
+$signedZip = [System.IO.Path]::ChangeExtension($signedZxp, '.zip')
+Copy-Item $signedZxp $signedZip -Force
+Expand-Archive -Path $signedZip -DestinationPath $signedDir -Force
+Remove-Item $signedZip -Force
+if (-not (Test-Path (Join-Path $signedDir 'META-INF\signatures.xml'))) {
+    Fail "signed extension is missing META-INF\signatures.xml"
+}
+Write-OK "CEP extension signed -> build\cep-signed\com.autoedit.premiere\"
 
 # ── Step 7: Launcher binaries ───────────────────────────────────────────────
 Write-Step "Building launcher binaries (dotnet publish)"

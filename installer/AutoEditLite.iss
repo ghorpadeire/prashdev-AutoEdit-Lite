@@ -86,9 +86,12 @@ Source: "build\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs
 
 ; Premiere CEP extension — the panel that shows up in
 ; Premiere Pro under Window > Extensions > AutoEdit.
+; Uses the SIGNED build (see build.ps1 step 6c). Premiere Pro 2024+
+; requires a valid signature; PlayerDebugMode lets it trust a self-signed
+; cert but does not skip the signature check itself.
 ; Installed unconditionally so it's wired up even if the user installs
 ; Premiere AFTER AutoEdit-Lite.
-Source: "build\cep\com.autoedit.premiere\*"; \
+Source: "build\cep-signed\com.autoedit.premiere\*"; \
     DestDir: "{userappdata}\Adobe\CEP\extensions\com.autoedit.premiere"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -118,13 +121,17 @@ Name: "{group}\Uninstall AutoEdit-Lite"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\AutoEdit-Lite";  Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Registry]
-; Premiere CEP PlayerDebugMode — required for unsigned extensions to load.
-; HKCU only, no admin needed. Written unconditionally so the panel works
-; once Premiere is installed (now or later).
+; Premiere CEP PlayerDebugMode — required so Premiere will trust our
+; self-signed extension certificate. HKCU only, no admin needed.
+; Written unconditionally so the panel works once Premiere is installed
+; (now or later). Covers Premiere Pro 2018 (CSXS 9) through 2026+ (CSXS 14).
 Root: HKCU; Subkey: "Software\Adobe\CSXS.9";  ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 Root: HKCU; Subkey: "Software\Adobe\CSXS.11"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 Root: HKCU; Subkey: "Software\Adobe\CSXS.12"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+Root: HKCU; Subkey: "Software\Adobe\CSXS.13"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+Root: HKCU; Subkey: "Software\Adobe\CSXS.14"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+Root: HKCU; Subkey: "Software\Adobe\CSXS.15"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 
 [Dirs]
 ; Pre-create per-user state directories so the launcher never has to.
