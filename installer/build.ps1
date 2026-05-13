@@ -82,10 +82,17 @@ Expand-Archive -Path $pyZip -DestinationPath $pyDir -Force
 # Write python311._pth deterministically. The stock file from the embed zip
 # has 'import site' commented out — we need site-packages discovery.
 $pthPath = Join-Path $pyDir 'python311._pth'
+#
+# Important: when a ._pth file exists, embedded Python runs in "isolated
+# mode" and does NOT auto-add the script's directory to sys.path. Our
+# app/main.py does `from transcribe import ...` against sibling modules,
+# so we must add `..\app` (relative to py\) explicitly. Without this, the
+# bundled launcher boots Python but main.py crashes at first import.
 @'
 python311.zip
 .
 Lib\site-packages
+..\app
 import site
 '@ | Set-Content -Path $pthPath -Encoding ASCII
 Write-OK "python311._pth written"

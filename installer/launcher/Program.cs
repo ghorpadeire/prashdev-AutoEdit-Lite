@@ -225,6 +225,17 @@ internal static class Launcher
         psi.ArgumentList.Add(Paths.MainPy);
         foreach (var a in args) psi.ArgumentList.Add(a);
 
+        // Forward the API key as an env var so analyze.py's
+        // `os.getenv("ANTHROPIC_API_KEY")` resolves without depending on
+        // python-dotenv's CWD-relative .env search. The key lives in
+        // %APPDATA%\AutoEditLite\.env, which the launcher already knows
+        // how to read.
+        var key = ApiKey.Read();
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            psi.Environment["ANTHROPIC_API_KEY"] = key;
+        }
+
 #if WINDOWED
         psi.RedirectStandardOutput = true;
         psi.RedirectStandardError  = true;
@@ -399,7 +410,7 @@ internal static class ApiKey
         return true;
     }
 
-    private static string? Read()
+    internal static string? Read()
     {
         if (!File.Exists(Paths.EnvFile)) return null;
         foreach (var raw in File.ReadAllLines(Paths.EnvFile))
