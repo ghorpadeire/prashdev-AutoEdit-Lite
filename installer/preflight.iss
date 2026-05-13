@@ -171,27 +171,67 @@ end;
 
 procedure WriteEnvFile();
 var
-  EnvDir: String;
-  EnvPath: String;
+  EnvDir, EnvPath, AppEnvPath: String;
   Key: String;
   Lines: TArrayOfString;
 begin
   Key := Trim(ApiKeyPage.Values[0]);
   if Key = '' then Exit;
 
+  // Survives uninstall (with default keep-data choice) — primary source.
   EnvDir := ExpandConstant('{userappdata}\AutoEditLite');
-  EnvPath := EnvDir + '\.env';
   ForceDirectories(EnvDir);
+  EnvPath := EnvDir + '\.env';
+
+  // Co-located with main.py so the Premiere CEP panel's spawned Python
+  // finds the key via load_dotenv() — its child_process.spawn uses
+  // backendPath as cwd, and load_dotenv searches the cwd.
+  AppEnvPath := ExpandConstant('{app}\app\.env');
 
   SetArrayLength(Lines, 1);
   Lines[0] := 'ANTHROPIC_API_KEY=' + Key;
   SaveStringsToFile(EnvPath, Lines, False);
+  SaveStringsToFile(AppEnvPath, Lines, False);
+end;
+
+// ---------------------------------------------------------------------------
+//  Write %APPDATA%\AutoEdit\settings.json — the bridge the Premiere CEP
+//  panel reads on first launch to discover where the Python backend lives.
+//  See installerSettingsPath() and the loadSettings() fallback in
+//  premiere-plugin\com.autoedit.premiere\client\main.js.
+// ---------------------------------------------------------------------------
+procedure WriteSettingsJson();
+var
+  SettingsDir, SettingsPath: String;
+  BackendPath, PythonPath: String;
+  Lines: TArrayOfString;
+begin
+  SettingsDir := ExpandConstant('{userappdata}\AutoEdit');
+  ForceDirectories(SettingsDir);
+  SettingsPath := SettingsDir + '\settings.json';
+
+  BackendPath := ExpandConstant('{app}\app');
+  PythonPath  := ExpandConstant('{app}\py\python.exe');
+
+  // JSON requires escaped backslashes in strings.
+  StringChangeEx(BackendPath, '\', '\\', True);
+  StringChangeEx(PythonPath,  '\', '\\', True);
+
+  SetArrayLength(Lines, 4);
+  Lines[0] := '{';
+  Lines[1] := '  "backendPath": "' + BackendPath + '",';
+  Lines[2] := '  "pythonPath":  "' + PythonPath  + '"';
+  Lines[3] := '}';
+  SaveStringsToFile(SettingsPath, Lines, False);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
     WriteEnvFile();
+    WriteSettingsJson();
+  end;
 end;
 
 // ---------------------------------------------------------------------------

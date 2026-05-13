@@ -84,6 +84,14 @@ Source: "build\ff\*"; DestDir: "{app}\ff"; Flags: ignoreversion recursesubdirs c
 ; Application source
 Source: "build\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Premiere CEP extension — the panel that shows up in
+; Premiere Pro under Window > Extensions > AutoEdit.
+; Installed unconditionally so it's wired up even if the user installs
+; Premiere AFTER AutoEdit-Lite.
+Source: "build\cep\com.autoedit.premiere\*"; \
+    DestDir: "{userappdata}\Adobe\CEP\extensions\com.autoedit.premiere"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
 ; Launcher binaries
 Source: "build\bin\{#AppExe}";    DestDir: "{app}"; Flags: ignoreversion
 Source: "build\bin\{#AppCliExe}"; DestDir: "{app}"; Flags: ignoreversion
@@ -110,23 +118,29 @@ Name: "{group}\Uninstall AutoEdit-Lite"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\AutoEdit-Lite";  Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Registry]
-; Premiere CEP PlayerDebugMode — HKCU only, no admin needed.
-; Each row is conditional on Premiere actually being detected.
-Root: HKCU; Subkey: "Software\Adobe\CSXS.9";  ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"; Check: IsPremiereInstalled
-Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"; Check: IsPremiereInstalled
-Root: HKCU; Subkey: "Software\Adobe\CSXS.11"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"; Check: IsPremiereInstalled
-Root: HKCU; Subkey: "Software\Adobe\CSXS.12"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"; Check: IsPremiereInstalled
+; Premiere CEP PlayerDebugMode — required for unsigned extensions to load.
+; HKCU only, no admin needed. Written unconditionally so the panel works
+; once Premiere is installed (now or later).
+Root: HKCU; Subkey: "Software\Adobe\CSXS.9";  ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+Root: HKCU; Subkey: "Software\Adobe\CSXS.11"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
+Root: HKCU; Subkey: "Software\Adobe\CSXS.12"; ValueType: string; ValueName: "PlayerDebugMode"; ValueData: "1"
 
 [Dirs]
 ; Pre-create per-user state directories so the launcher never has to.
 Name: "{userappdata}\AutoEditLite";        Permissions: users-modify
 Name: "{userappdata}\AutoEditLite\logs";   Permissions: users-modify
 Name: "{userappdata}\AutoEditLite\models"; Permissions: users-modify
+; Panel reads its bridge config from here — see WriteSettingsJson in preflight.iss.
+Name: "{userappdata}\AutoEdit";            Permissions: users-modify
 
 [UninstallDelete]
 ; Wipe logs but keep .env and models by default — see CurUninstallStepChanged
 ; in preflight.iss for the optional full-wipe prompt.
 Type: filesandordirs; Name: "{userappdata}\AutoEditLite\logs"
+; Remove the panel and its installer-written settings; rebuild on reinstall.
+Type: filesandordirs; Name: "{userappdata}\Adobe\CEP\extensions\com.autoedit.premiere"
+Type: files;          Name: "{userappdata}\AutoEdit\settings.json"
 
 [Code]
 // Pascal helpers + custom wizard pages live in a separate file

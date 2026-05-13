@@ -172,6 +172,15 @@ foreach ($f in $pyFiles) {
 Copy-Item -Path (Join-Path $repoRoot 'prompts') -Destination $appDst -Recurse
 Write-OK "app\ staged ($($pyFiles.Count) modules + prompts\)"
 
+# ── Step 6b: Premiere CEP extension (the panel that appears in Premiere) ────
+Write-Step "Staging Premiere CEP extension"
+$cepDst = Join-Path $buildDir 'cep\com.autoedit.premiere'
+$cepSrc = Join-Path $repoRoot 'premiere-plugin\com.autoedit.premiere'
+if (-not (Test-Path $cepSrc)) { Fail "premiere-plugin source missing at $cepSrc" }
+New-Item -ItemType Directory -Path $cepDst -Force | Out-Null
+Copy-Item -Path "$cepSrc\*" -Destination $cepDst -Recurse -Force
+Write-OK "Premiere CEP extension staged at build\cep\com.autoedit.premiere\"
+
 # ── Step 7: Launcher binaries ───────────────────────────────────────────────
 Write-Step "Building launcher binaries (dotnet publish)"
 $binDst = Join-Path $buildDir 'bin'
