@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -86,13 +87,28 @@ def _validate_input(input_path: Path) -> None:
 
 
 def _check_ffmpeg_available() -> None:
-    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
-        print("\n[ERROR] FFmpeg or ffprobe was not found on your PATH.")
-        print("  Windows: https://github.com/BtbN/FFmpeg-Builds/releases")
-        print("           Download, unzip, and add the 'bin' folder to your PATH.")
-        print("  Mac:     brew install ffmpeg")
-        print("  Then open a NEW terminal and try again.\n")
-        sys.exit(1)
+    if shutil.which("ffmpeg") and shutil.which("ffprobe"):
+        return
+
+    # Bundled-installer fallback. When this script is shipped via the Windows
+    # installer, ffmpeg lives at {install}\ff\bin\ alongside the {install}\app\
+    # directory that holds this file. The CLI launcher prepends that dir to
+    # PATH already, but the Premiere CEP panel spawns Python via Node's
+    # child_process.spawn which doesn't, so without this fallback the panel
+    # sees no ffmpeg on a clean machine that lacks a system install.
+    bundled_bin = Path(__file__).resolve().parent.parent / "ff" / "bin"
+    exe_name = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    if (bundled_bin / exe_name).exists():
+        os.environ["PATH"] = str(bundled_bin) + os.pathsep + os.environ.get("PATH", "")
+        if shutil.which("ffmpeg") and shutil.which("ffprobe"):
+            return
+
+    print("\n[ERROR] FFmpeg or ffprobe was not found on your PATH.")
+    print("  Windows: https://github.com/BtbN/FFmpeg-Builds/releases")
+    print("           Download, unzip, and add the 'bin' folder to your PATH.")
+    print("  Mac:     brew install ffmpeg")
+    print("  Then open a NEW terminal and try again.\n")
+    sys.exit(1)
 
 
 def _parse_args() -> argparse.Namespace:

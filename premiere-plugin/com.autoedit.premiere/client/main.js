@@ -249,9 +249,26 @@
       "--output",          path.join(outputDir, videoBase + "_autoedit.mp4"),
     ];
 
+    // If the bundled installer is in use, prepend the bundled ffmpeg/bin to
+    // PATH so main.py's shutil.which("ffmpeg") and subprocess.run("ffprobe")
+    // find the bundled binaries on a fresh Windows box without system ffmpeg.
+    // Install layout: {installRoot}\app\main.py + {installRoot}\ff\bin\.
+    var childEnv = Object.assign({}, process.env);
+    try {
+      var installRoot   = path.dirname(settings.backendPath);
+      var bundledFfBin  = path.join(installRoot, "ff", "bin");
+      var bundledFfmpeg = path.join(bundledFfBin, os.platform() === "win32" ? "ffmpeg.exe" : "ffmpeg");
+      if (fs.existsSync(bundledFfmpeg)) {
+        // Windows env var name is case-insensitive but Node preserves the
+        // original case in process.env — use whichever key actually exists.
+        var pathKey = childEnv.PATH ? "PATH" : (childEnv.Path ? "Path" : "PATH");
+        childEnv[pathKey] = bundledFfBin + path.delimiter + (childEnv[pathKey] || "");
+      }
+    } catch (e) {}
+
     startRun();
 
-    var proc = child_process.spawn(python, args, { cwd: settings.backendPath });
+    var proc = child_process.spawn(python, args, { cwd: settings.backendPath, env: childEnv });
 
     proc.stdout.on("data", function (data) {
       var text = data.toString();
