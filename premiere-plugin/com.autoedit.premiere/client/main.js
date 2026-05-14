@@ -249,21 +249,28 @@
       "--output",          path.join(outputDir, videoBase + "_autoedit.mp4"),
     ];
 
-    // If the bundled installer is in use, prepend the bundled ffmpeg/bin to
-    // PATH so main.py's shutil.which("ffmpeg") and subprocess.run("ffprobe")
-    // find the bundled binaries on a fresh Windows box without system ffmpeg.
-    // Install layout: {installRoot}\app\main.py + {installRoot}\ff\bin\.
+    // If the bundled installer is in use, prepend its ff\bin to PATH and
+    // redirect the HuggingFace cache into the per-user AutoEditLite folder.
+    // Install layout: {installRoot}\app\main.py and {installRoot}\ff\bin\.
+    // Without this, panel-spawned Python on a clean Windows box can't find
+    // ffmpeg/ffprobe and crashes at the start of transcription.
     var childEnv = Object.assign({}, process.env);
     try {
       var installRoot   = path.dirname(settings.backendPath);
       var bundledFfBin  = path.join(installRoot, "ff", "bin");
       var bundledFfmpeg = path.join(bundledFfBin, os.platform() === "win32" ? "ffmpeg.exe" : "ffmpeg");
       if (fs.existsSync(bundledFfmpeg)) {
-        // Windows env var name is case-insensitive but Node preserves the
-        // original case in process.env — use whichever key actually exists.
         var pathKey = childEnv.PATH ? "PATH" : (childEnv.Path ? "Path" : "PATH");
         childEnv[pathKey] = bundledFfBin + path.delimiter + (childEnv[pathKey] || "");
       }
+      // Co-locate HF model cache with the rest of our per-user state so it
+      // survives uninstall and doesn't pollute ~/.cache/huggingface.
+      if (os.platform() === "win32" && process.env.APPDATA) {
+        childEnv.HF_HOME = path.join(process.env.APPDATA, "AutoEditLite", "models");
+      }
+      // Silence the cosmetic symlink warning HF emits on Windows when developer
+      // mode is off — it's not actionable and looks alarming in the panel log.
+      childEnv.HF_HUB_DISABLE_SYMLINKS_WARNING = "1";
     } catch (e) {}
 
     startRun();
