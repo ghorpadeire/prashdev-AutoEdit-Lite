@@ -84,6 +84,14 @@ Source: "build\ff\*"; DestDir: "{app}\ff"; Flags: ignoreversion recursesubdirs c
 ; Application source
 Source: "build\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Pre-bundled Whisper "base" model -- eliminates the 10-min first-run
+; download for the client. The panel's first-launch "Studio Model" prompt
+; offers the optional 1.5 GB "medium" upgrade, which lands in a sibling
+; HF cache directory and survives reinstalls.
+Source: "build\models\hub\*"; \
+    DestDir: "{userappdata}\AutoEditLite\models\hub"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
 ; Premiere CEP extension — the panel that shows up in
 ; Premiere Pro under Window > Extensions > AutoEdit.
 ; Uses the SIGNED build (see build.ps1 step 6c). Premiere Pro 2024+

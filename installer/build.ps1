@@ -122,6 +122,37 @@ $lockPath = Join-Path $buildDir 'requirements.lock'
 & $pyExe -m pip freeze | Set-Content -Path $lockPath -Encoding ASCII
 Write-OK "requirements.lock written"
 
+# ── Step 2c: Pre-download Whisper "base" model into bundle ─────────────────
+# Ship the base model inside the installer so the client sees zero download
+# wait on first edit. The larger "medium" model stays opt-in via the panel's
+# first-launch Studio Model prompt -- bundling it would balloon the installer
+# from ~370 MB to ~1.7 GB.
+Write-Step "Pre-downloading faster-whisper 'base' model into bundle"
+$modelsDst = Join-Path $buildDir 'models'
+New-Item -ItemType Directory -Path $modelsDst -Force | Out-Null
+$env:HF_HUB_DISABLE_SYMLINKS_WARNING = '1'
+$dlScript = @"
+import os, sys
+os.environ['HF_HOME'] = r'$modelsDst'
+from huggingface_hub import snapshot_download
+try:
+    snapshot_download(repo_id='Systran/faster-whisper-base', cache_dir=r'$modelsDst\hub')
+except Exception as e:
+    print('BASE_MODEL_FAIL: ' + str(e), file=sys.stderr)
+    sys.exit(1)
+"@
+# Don't pipe stderr -- HF emits progress bars and unauthenticated-request
+# warnings on stderr, and our strict-mode PowerShell wrapper would treat
+# any stderr write from a native command as a terminating error. Trust the
+# exit code instead, then verify by checking the resulting directory.
+& $pyExe -c $dlScript
+$baseDir = Join-Path $modelsDst 'hub\models--Systran--faster-whisper-base'
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $baseDir 'snapshots'))) {
+    Fail "base model download did not populate $baseDir"
+}
+$modelMB = [math]::Round((Get-ChildItem $modelsDst -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+Write-OK "base model staged ($modelMB MB) at $baseDir"
+
 # ── Step 3: Embedded-runtime smoke test ─────────────────────────────────────
 Write-Step "Smoke-testing imports inside the embedded runtime"
 $smokeScript = @'

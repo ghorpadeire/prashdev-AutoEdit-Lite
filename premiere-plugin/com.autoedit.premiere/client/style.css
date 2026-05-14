@@ -844,3 +844,83 @@ select:focus {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.18);
 }
+
+/* ── Studio Model upgrade overlay (first-launch only) ───────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.overlay.hidden { display: none; }
+
+.overlay-card {
+  width: 280px;
+  padding: 24px 22px;
+  text-align: center;
+  border-radius: 14px;
+}
+.overlay-icon {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.overlay-title {
+  font-size: 16px;
+  margin: 4px 0 12px;
+  font-weight: 600;
+}
+.overlay-desc {
+  margin: 10px 0 6px;
+  opacity: 0.85;
+  font-size: 13px;
+}
+.overlay-list {
+  text-align: left;
+  margin: 8px 22px 4px;
+  opacity: 0.8;
+  font-size: 12.5px;
+  line-height: 1.6;
+  padding-left: 16px;
+}
+.overlay-size {
+  margin: 14px 0 18px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.overlay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.overlay-progress-text {
+  margin-top: 12px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+.overlay-error {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  color: #ff7a7a;
+}
+
+.progress-bar-marquee {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(91, 141, 239, 0) 0%,
+    rgba(91, 141, 239, 0.9) 50%,
+    rgba(91, 141, 239, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: marquee 1.4s infinite linear;
+}
+@keyframes marquee {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}

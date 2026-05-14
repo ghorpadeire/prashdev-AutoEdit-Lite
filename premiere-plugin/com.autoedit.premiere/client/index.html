@@ -224,6 +224,33 @@
   <!-- Sparkle decoration -->
   <div class="sparkle">✦</div>
 
+  <!-- ── Studio Model upgrade overlay (first-launch only) ──────────────── -->
+  <div id="model-upgrade-overlay" class="overlay hidden">
+    <div class="overlay-card glass">
+      <div class="overlay-icon">⭐</div>
+      <h2 class="overlay-title">Studio Transcription Model</h2>
+      <p class="overlay-desc">Recommended for higher-quality transcription on:</p>
+      <ul class="overlay-list">
+        <li>Podcasts &amp; interviews</li>
+        <li>Accented or non-native English</li>
+        <li>Noisy or multi-speaker audio</li>
+      </ul>
+      <p class="overlay-size">One-time download • ~1.5 GB</p>
+
+      <div id="model-upgrade-progress" class="hidden">
+        <div class="progress-bar-marquee"></div>
+        <p class="overlay-progress-text">Downloading… please don't close Premiere.</p>
+      </div>
+
+      <p id="model-upgrade-error" class="overlay-error hidden"></p>
+
+      <div id="model-upgrade-actions" class="overlay-actions">
+        <button id="btn-download-medium" class="btn btn-primary">Download Now</button>
+        <button id="btn-skip-medium" class="btn btn-secondary">Skip for now</button>
+      </div>
+    </div>
+  </div>
+
   <script src="CSInterface.js"></script>
   <script src="main.js"></script>
 </body>
