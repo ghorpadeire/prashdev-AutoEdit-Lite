@@ -281,21 +281,15 @@ def export_premiere_xml(
     video_track = otio.schema.Track(name="Video 1", kind=otio.schema.TrackKind.Video)
     timeline.tracks.append(video_track)
 
-    # Single audio track that carries the full multi-channel source. Premiere
-    # reads the actual channel count from the file-level <media>/<audio>
-    # declaration (see _build_file_audio_xml) and from the sequence-level
-    # <audiochanneltype>Stereo|Mono</audiochanneltype> tag injected in
-    # _inject_sequence_settings, so one track is enough.
-    #
-    # The previous design created one Track per source channel and appended
-    # the same clip to each — which routes the same stereo file onto
-    # multiple tracks and can produce silent audio in Premiere 2024+ because
-    # the importer cannot resolve which source channel feeds which track.
-    audio_track = otio.schema.Track(
-        name="Audio 1",
-        kind=otio.schema.TrackKind.Audio,
-    )
-    timeline.tracks.append(audio_track)
+    # FCP7 XML expects one sequence audio track per source channel.
+    audio_tracks = []
+    for channel_index in range(max(1, num_channels)):
+        audio_track = otio.schema.Track(
+            name=f"Audio {channel_index + 1}",
+            kind=otio.schema.TrackKind.Audio,
+        )
+        timeline.tracks.append(audio_track)
+        audio_tracks.append(audio_track)
 
     abs_path = str(Path(input_video_path).resolve())
     abs_posix = Path(abs_path).as_posix()
@@ -328,11 +322,12 @@ def export_premiere_xml(
             media_reference=media_ref,
             source_range=source_range,
         ))
-        audio_track.append(otio.schema.Clip(
-            name=label,
-            media_reference=media_ref,
-            source_range=source_range,
-        ))
+        for audio_track in audio_tracks:
+            audio_track.append(otio.schema.Clip(
+                name=label,
+                media_reference=media_ref,
+                source_range=source_range,
+            ))
 
     output_path = Path(output_xml_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
